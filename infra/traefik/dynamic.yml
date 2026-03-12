@@ -1,0 +1,31 @@
+tls:
+  certificates:
+    - certFile: /certs/local-cert.pem
+      keyFile: /certs/local-key.pem
+
+http:
+  routers:
+    web-router:
+      rule: "Host(`localhost`) && !PathPrefix(`/api`)"
+      service: web-service
+      entryPoints:
+        - websecure
+      tls: {}
+
+    api-router:
+      rule: "Host(`localhost`) && PathPrefix(`/api`)"
+      service: api-service
+      entryPoints:
+        - websecure
+      tls: {}
+
+  services:
+    web-service:
+      loadBalancer:
+        servers:
+          - url: "http://web:4321"
+
+    api-service:
+      loadBalancer:
+        servers:
+          - url: "http://api:8000"

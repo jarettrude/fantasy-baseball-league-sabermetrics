@@ -1,0 +1,57 @@
+---
+import AppLayout from "../../layouts/AppLayout.astro";
+import MatchupsView from "../../components/MatchupsView.svelte";
+import StandingsView from "../../components/StandingsView.svelte";
+
+export const prerender = false;
+
+const { id } = Astro.params;
+const weekId = Number(id);
+---
+
+<AppLayout title={`Week ${weekId}`}>
+  <div class="space-y-10">
+    <div>
+      <h1
+        class="font-display text-3xl md:text-4xl font-extrabold tracking-tight text-(--color-text)"
+      >
+        WEEK {weekId} ANALYSIS
+      </h1>
+      <p
+        class="font-mono text-xs text-(--color-text-muted) mt-1"
+      >
+        HISTORICAL REPOSITORY
+      </p>
+    </div>
+
+    <section class="space-y-4">
+      <div
+        class="flex items-center gap-3"
+      >
+        <span
+          class="font-mono text-[0.55rem] font-bold tracking-widest text-(--color-text-muted)"
+          >01</span
+        >
+        <h2 class="font-display text-xl font-extrabold tracking-tight text-(--color-text)">
+          MATCHUPS
+        </h2>
+      </div>
+      <MatchupsView client:load week={weekId} />
+    </section>
+
+    <section class="space-y-4">
+      <div
+        class="flex items-center gap-3"
+      >
+        <span
+          class="font-mono text-[0.55rem] font-bold tracking-widest text-(--color-text-muted)"
+          >02</span
+        >
+        <h2 class="font-display text-xl font-extrabold tracking-tight text-(--color-text)">
+          STANDINGS
+        </h2>
+      </div>
+      <StandingsView client:load />
+    </section>
+  </div>
+</AppLayout>

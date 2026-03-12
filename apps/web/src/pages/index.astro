@@ -1,0 +1,312 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import Navbar from "../components/Navbar.svelte";
+import Footer from "../components/Footer.svelte";
+import HeroActions from "../components/HeroActions.svelte";
+---
+
+<BaseLayout
+  title="Home"
+  description="Your fantasy baseball companion. AI-powered recaps, player valuations, and deep analytics for your Yahoo H2H Categories league."
+>
+  <Navbar client:load />
+  <main>
+    <!-- Hero: bold structured editorial header -->
+    <section
+      class="relative overflow-hidden bg-(--color-surface-inset) py-16 md:py-24 grain"
+    >
+      <!-- High-contrast grid background -->
+      <div
+        class="absolute inset-0 opacity-[0.03] pointer-events-none"
+        style="background-image: linear-gradient(var(--color-text) 1px, transparent 1px), linear-gradient(90deg, var(--color-text) 1px, transparent 1px); background-size: 64px 64px;"
+      >
+      </div>
+
+      <div class="relative mx-auto max-w-7xl px-page">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+          <div class="animate-fade-in">
+            <div
+              class="inline-flex items-center gap-2 font-mono text-xs font-bold tracking-widest uppercase text-(--color-commissioner) mb-6"
+            >
+              <span class="status-dot status-dot-success"
+              ></span>
+              SABERMETRIC PLATFORM // ACTIVE
+            </div>
+
+            <h1
+              class="font-display text-5xl sm:text-6xl md:text-7xl font-extrabold tracking-tight leading-[0.9] text-(--color-text)"
+            >
+              MOOSE<br />
+              <span class="text-(--color-accent-ember)"
+                >SPORTS</span
+              ><br />
+              EMPIRE
+            </h1>
+
+            <p
+              class="mt-6 max-w-md font-body text-base md:text-lg text-(--color-text-secondary) leading-relaxed"
+            >
+              Ascend to the throne. Rich baseball analytics, ruthless player
+              valuations, and deep league insights.
+            </p>
+
+            <HeroActions client:load />
+          </div>
+          <div class="hidden lg:block">
+            <div
+              class="card p-6 border-l-4 border-l-(--color-commissioner)"
+            >
+              <div
+                class="absolute -top-3 -right-3 h-12 w-12 rounded-full bg-(--color-surface-raised) border border-(--color-border) flex items-center justify-center"
+              >
+                <span class="animate-spin-slow text-(--color-commissioner) text-lg"
+                >&#9776;</span>
+              </div>
+
+              <div class="space-y-4">
+                <div
+                  class="flex items-center justify-between border-b border-(--color-border-subtle) pb-3"
+                >
+                  <span
+                    class="font-mono text-xs font-bold tracking-widest uppercase text-(--color-text-muted)"
+                    >SYSTEM STATUS</span
+                  >
+                  <span
+                    class="badge badge-success"
+                    >ONLINE</span
+                  >
+                </div>
+
+                <div class="space-y-3">
+                  <div class="flex items-center justify-between">
+                    <div
+                      class="flex items-center gap-2 font-mono text-xs text-(--color-text-secondary)"
+                    >
+                      <span
+                        class="status-dot status-dot-success"
+                      ></span>
+                      LEAGUE SYNC
+                    </div>
+                    <div
+                      class="font-mono text-xs font-bold text-(--color-success)"
+                    >
+                      ACTIVE
+                    </div>
+                  </div>
+
+                  <div class="flex items-center justify-between">
+                    <div
+                      class="flex items-center gap-2 font-mono text-xs text-(--color-text-secondary)"
+                    >
+                      <span
+                        class="status-dot status-dot-info"
+                      ></span>
+                      SCOUTING REPORTS
+                    </div>
+                    <div
+                      class="font-mono text-xs font-bold text-(--color-info)"
+                    >
+                      ENABLED
+                    </div>
+                  </div>
+
+                  <div class="flex items-center justify-between">
+                    <div
+                      class="flex items-center gap-2 font-mono text-xs text-(--color-text-secondary)"
+                    >
+                      <span
+                        class="status-dot status-dot-success"
+                      ></span>
+                      SABERMETRIC ENGINE
+                    </div>
+                    <div
+                      class="font-mono text-xs font-bold text-(--color-success)"
+                    >
+                      OPTIMUM
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Front Office Tools — 4 linked action cards -->
+    <section
+      class="relative py-16 md:py-24 bg-(--color-surface-base)"
+    >
+      <!-- Decorative offset stripe -->
+      <div
+        class="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-(--color-accent-amber) via-(--color-accent-ember) to-(--color-accent-amber)"
+      >
+      </div>
+
+      <div class="mx-auto max-w-7xl px-page">
+        <div class="mb-12 max-w-xl">
+          <span
+            class="font-mono text-xs font-bold tracking-widest uppercase text-(--color-commissioner) mb-3 block"
+            >FRONT OFFICE TOOLS</span
+          >
+          <h2
+            class="font-display text-3xl md:text-4xl font-extrabold tracking-tight text-(--color-text) leading-tight"
+          >
+            Command<br class="hidden sm:block" /> Your Franchise
+          </h2>
+          <p
+            class="mt-4 font-body text-(--color-text-secondary) leading-relaxed"
+          >
+            Everything you need to outmaneuver your league — from daily roster
+            decisions to season-long dominance.
+          </p>
+        </div>
+
+        <div
+          class="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6 stagger-in"
+        >
+          <!-- Card 01: Player Valuations -->
+          <a
+            href="/bench"
+            class="card group flex flex-col justify-between p-6 hover:shadow-lg hover:border-(--color-border-heavy) transition-all duration-200"
+            aria-label="Go to Player Valuations"
+          >
+            <div>
+              <div
+                class="section-number mb-4 inline-block"
+              >
+                01
+              </div>
+              <h3
+                class="font-display text-xl font-bold text-(--color-text) mb-2"
+              >
+                Player<br />Valuations
+              </h3>
+              <p
+                class="text-sm text-(--color-text-muted) leading-relaxed"
+              >
+                Z-score valuations across all H2H categories. Find hidden gems
+                and expose dead roster weight.
+              </p>
+            </div>
+            <div
+              class="mt-6 flex items-center justify-between border-t border-(--color-border-subtle) pt-4 font-mono text-xs font-bold tracking-wide uppercase text-(--color-commissioner)"
+            >
+              <span>TEAM BENCH</span>
+              <span
+                class="group-hover:translate-x-1 transition-transform duration-200"
+                >&rarr;</span
+              >
+            </div>
+          </a>
+
+          <!-- Card 02: Scouting Reports -->
+          <a
+            href="/commish-notes"
+            class="card group flex flex-col justify-between p-6 hover:shadow-lg hover:border-(--color-border-heavy) transition-all duration-200"
+            aria-label="Go to Scouting Reports"
+          >
+            <div>
+              <div
+                class="section-number mb-4 inline-block"
+              >
+                02
+              </div>
+              <h3
+                class="font-display text-xl font-bold text-(--color-text) mb-2"
+              >
+                Scouting<br />Reports
+              </h3>
+              <p
+                class="text-sm text-(--color-text-muted) leading-relaxed"
+              >
+                Weekly AI recaps for your league and every manager. Surface
+                market inefficiencies before anyone else.
+              </p>
+            </div>
+            <div
+              class="mt-6 flex items-center justify-between border-t border-(--color-border-subtle) pt-4 font-mono text-xs font-bold tracking-wide uppercase text-(--color-commissioner)"
+            >
+              <span>COMMISH NOTES</span>
+              <span
+                class="group-hover:translate-x-1 transition-transform duration-200"
+                >&rarr;</span
+              >
+            </div>
+          </a>
+
+          <!-- Card 03: Team Bench -->
+          <a
+            href="/bench"
+            class="card group flex flex-col justify-between p-6 hover:shadow-lg hover:border-(--color-border-heavy) transition-all duration-200"
+            aria-label="Go to Team Bench"
+          >
+            <div>
+              <div
+                class="section-number mb-4 inline-block"
+              >
+                03
+              </div>
+              <h3
+                class="font-display text-xl font-bold text-(--color-text) mb-2"
+              >
+                Team<br />Bench
+              </h3>
+              <p
+                class="text-sm text-(--color-text-muted) leading-relaxed"
+              >
+                Start/sit decisions, free agent targets, and daily roster
+                optimization backed by real projections.
+              </p>
+            </div>
+            <div
+              class="mt-6 flex items-center justify-between border-t border-(--color-border-subtle) pt-4 font-mono text-xs font-bold tracking-wide uppercase text-(--color-commissioner)"
+            >
+              <span>MANAGE ROSTER</span>
+              <span
+                class="group-hover:translate-x-1 transition-transform duration-200"
+                >&rarr;</span
+              >
+            </div>
+          </a>
+
+          <!-- Card 04: League Analytics -->
+          <a
+            href="/dashboard"
+            class="card group flex flex-col justify-between p-6 hover:shadow-lg hover:border-(--color-border-heavy) transition-all duration-200"
+            aria-label="Go to League Analytics on Dashboard"
+          >
+            <div>
+              <div
+                class="section-number mb-4 inline-block"
+              >
+                04
+              </div>
+              <h3
+                class="font-display text-xl font-bold text-(--color-text) mb-2"
+              >
+                League<br />Analytics
+              </h3>
+              <p
+                class="text-sm text-(--color-text-muted) leading-relaxed"
+              >
+                Head-to-head matchup breakdowns, standings engine, and full
+                league overview in your command center.
+              </p>
+            </div>
+            <div
+              class="mt-6 flex items-center justify-between border-t border-(--color-border-subtle) pt-4 font-mono text-xs font-bold tracking-wide uppercase text-(--color-commissioner)"
+            >
+              <span>OPEN DASHBOARD</span>
+              <span
+                class="group-hover:translate-x-1 transition-transform duration-200"
+                >&rarr;</span
+              >
+            </div>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+  <Footer client:load />
+</BaseLayout>

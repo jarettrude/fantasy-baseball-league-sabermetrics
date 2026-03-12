@@ -1,0 +1,23 @@
+---
+import BaseLayout from "./BaseLayout.astro";
+import Navbar from "../components/Navbar.svelte";
+import Footer from "../components/Footer.svelte";
+
+interface Props {
+  title: string;
+  description?: string;
+  noindex?: boolean;
+}
+
+const { title, description, noindex = true } = Astro.props;
+---
+
+<BaseLayout title={title} description={description} noindex={noindex}>
+  <div class="flex min-h-screen flex-col">
+    <Navbar client:load />
+    <main class="flex-1 px-page py-6 md:py-10">
+      <slot />
+    </main>
+    <Footer client:load />
+  </div>
+</BaseLayout>

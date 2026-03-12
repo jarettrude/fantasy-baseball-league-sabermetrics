@@ -1,0 +1,12 @@
+---
+import AppLayout from "../../layouts/AppLayout.astro";
+import AdminView from "../../components/AdminView.svelte";
+import AdminNav from "../../components/AdminNav.svelte";
+---
+
+<AppLayout title="Admin">
+  <div class="space-y-6">
+    <AdminNav currentPath="/admin" />
+    <AdminView client:load />
+  </div>
+</AppLayout>

@@ -1,0 +1,26 @@
+---
+import AppLayout from "../layouts/AppLayout.astro";
+import RecapsView from "../components/RecapsView.svelte";
+---
+
+<AppLayout title="Commish Notes">
+  <div class="space-y-8">
+    <div>
+      <div
+        class="font-mono text-xs font-bold tracking-widest uppercase text-(--color-commissioner) mb-1"
+      >
+        From the Desk Of
+      </div>
+      <h1
+        class="font-display text-3xl md:text-4xl font-extrabold tracking-tight text-(--color-text)"
+      >
+        The Commissioner
+      </h1>
+      <p class="font-mono text-xs text-(--color-text-muted) mt-1">
+        // WEEKLY LEAGUE SCOUTING REPORT
+      </p>
+    </div>
+
+    <RecapsView client:load />
+  </div>
+</AppLayout>

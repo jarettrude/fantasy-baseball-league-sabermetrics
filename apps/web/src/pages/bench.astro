@@ -1,0 +1,52 @@
+---
+import AppLayout from "../layouts/AppLayout.astro";
+import BenchView from "../components/BenchView.svelte";
+import FreeAgentsView from "../components/FreeAgentsView.svelte";
+---
+
+<AppLayout title="Team Bench">
+  <div class="space-y-10">
+    <div>
+      <h1
+        class="font-display text-3xl md:text-4xl font-extrabold tracking-tight text-(--color-text)"
+      >
+        TEAM BENCH //
+      </h1>
+      <p
+        class="font-mono text-xs text-(--color-text-muted) mt-1"
+      >
+        ROSTER & FREE AGENT MANAGEMENT
+      </p>
+    </div>
+
+    <section class="space-y-4">
+      <div
+        class="flex items-center gap-3"
+      >
+        <span
+          class="font-mono text-[0.55rem] font-bold tracking-widest text-(--color-text-muted)"
+          >01</span
+        >
+        <h2 class="font-display text-xl font-extrabold tracking-tight text-(--color-text)">
+          MY ROSTER
+        </h2>
+      </div>
+      <BenchView client:load />
+    </section>
+
+    <section class="space-y-4">
+      <div
+        class="flex items-center gap-3"
+      >
+        <span
+          class="font-mono text-[0.55rem] font-bold tracking-widest text-(--color-text-muted)"
+          >02</span
+        >
+        <h2 class="font-display text-xl font-extrabold tracking-tight text-(--color-text)">
+          FREE AGENTS
+        </h2>
+      </div>
+      <FreeAgentsView client:load />
+    </section>
+  </div>
+</AppLayout>

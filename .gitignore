@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+.ruff_cache/
+
+# Build outputs
+dist/
+.astro/
+*.egg-info/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+.agents/
+.windsurf/
+
+# Docker
+docker-compose.override.yml
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+coverage/
+
+# Local TLS certs
+infra/certs/
+infra/traefik/certs/
+
+# Trained models
+apps/api/src/moose_api/services/prediction/trained/
+
+# Misc
+*.log
+.cache/
+secrets/

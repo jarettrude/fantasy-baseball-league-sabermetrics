@@ -1,0 +1,129 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout
+  title="Privacy Policy — Moose Sports Empire"
+  description="Privacy policy for the Moose Sports Empire fantasy baseball app."
+>
+  <div class="max-w-3xl mx-auto px-4 py-12">
+    <h1 class="font-display text-3xl md:text-4xl font-extrabold tracking-tight text-(--color-text) mb-8">Privacy Policy</h1>
+
+    <div class="space-y-8">
+      <section>
+        <h2 class="font-display text-xl font-extrabold tracking-tight text-(--color-text) mb-3">
+          1. Overview
+        </h2>
+        <p class="text-sm text-(--color-text-muted) leading-relaxed">
+          Moose Sports Empire is a self-hosted, private fantasy baseball
+          companion application for Yahoo H2H Categories leagues. This
+          application is not affiliated with Yahoo Inc. or Major League
+          Baseball.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="font-display text-xl font-extrabold tracking-tight text-(--color-text) mb-3">
+          2. Data We Collect
+        </h2>
+        <ul class="space-y-3 text-sm text-(--color-text-muted) leading-relaxed list-disc pl-5">
+          <li>
+            <strong class="text-(--color-text)">Yahoo Account Data:</strong> When
+            you log in with Yahoo, we receive your Yahoo GUID, display name, email,
+            and fantasy league data via the Yahoo Fantasy Sports API (read-only scope).
+          </li>
+          <li>
+            <strong class="text-(--color-text)">Session Data:</strong> We store session
+            actions in a server-side log for auditing purposes. Logs are purged after
+            30 days. No IP addresses are stored.
+          </li>
+          <li>
+            <strong class="text-(--color-text)">League Data:</strong> Team names,
+            standings, matchup results, and player statistics are fetched from Yahoo
+            and stored locally for performance.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="font-display text-xl font-extrabold tracking-tight text-(--color-text) mb-3">
+          3. Data We Do Not Collect
+        </h2>
+        <ul class="space-y-1 text-sm text-(--color-text-muted) leading-relaxed list-disc pl-5">
+          <li>Email addresses</li>
+          <li>IP addresses</li>
+          <li>Payment information</li>
+          <li>
+            Any data from Yahoo beyond what is required for league
+            administration
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="font-display text-xl font-extrabold tracking-tight text-(--color-text) mb-3">
+          4. AI-Generated Content
+        </h2>
+        <p class="text-sm text-(--color-text-muted) leading-relaxed">
+          Weekly recaps are generated using Google Gemini (via Google AI Studio)
+          or OpenRouter as a fallback. League and player statistics are sent to
+          these services for recap generation. No personally identifiable
+          information beyond public fantasy league data is included in AI
+          prompts. Raw prompt data is purged after 30 days.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="font-display text-xl font-extrabold tracking-tight text-(--color-text) mb-3">
+          5. Token Security
+        </h2>
+        <p class="text-sm text-(--color-text-muted) leading-relaxed">
+          Yahoo OAuth tokens are encrypted using Fernet symmetric encryption
+          before storage. Tokens are never stored in plaintext. Sessions are
+          managed via HTTP-only, secure, SameSite cookies.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="font-display text-xl font-extrabold tracking-tight text-(--color-text) mb-3">
+          6. Data Retention
+        </h2>
+        <ul class="space-y-1 text-sm text-(--color-text-muted) leading-relaxed list-disc pl-5">
+          <li>Session logs: 30 days</li>
+          <li>AI usage logs: 30 days</li>
+          <li>Recap stat payloads: 30 days</li>
+          <li>League/player data: retained for the season duration</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="font-display text-xl font-extrabold tracking-tight text-(--color-text) mb-3">
+          7. Self-Hosted Instance
+        </h2>
+        <p class="text-sm text-(--color-text-muted) leading-relaxed">
+          This application is self-hosted by your league commissioner. The
+          commissioner controls all data stored on this instance. If you have
+          questions about your data, contact your league commissioner directly.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="font-display text-xl font-extrabold tracking-tight text-(--color-text) mb-3">
+          8. Open Source
+        </h2>
+        <p class="text-sm text-(--color-text-muted) leading-relaxed">
+          This application is open source under the MIT license. You can review
+          the full source code to understand exactly what data is collected and
+          how it is used.
+        </p>
+      </section>
+    </div>
+
+    <div class="mt-10 pt-6 border-t border-(--color-border-subtle)">
+      <p class="font-mono text-[0.6rem] text-(--color-text-muted)">
+        Last updated: March 2026. Not affiliated with Yahoo Inc. or Major League
+        Baseball.
+      </p>
+    </div>
+  </div>
+</BaseLayout>

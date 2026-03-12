@@ -1,0 +1,420 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import Navbar from "../components/Navbar.svelte";
+import Footer from "../components/Footer.svelte";
+---
+
+<BaseLayout
+  title="FAQ — Player Data & Valuations"
+  description="How Moose Sports Empire ingests baseball data and turns it into season & next-seven projections."
+  noindex={false}
+>
+  <div class="flex min-h-screen flex-col">
+    <Navbar client:load />
+    <main class="flex-1">
+      <div class="max-w-4xl mx-auto px-4 py-12 space-y-10">
+        <div>
+          <div
+            class="font-mono text-xs font-bold tracking-widest uppercase text-(--color-commissioner) mb-1"
+          >
+            Front Office FAQ
+          </div>
+          <h1
+            class="font-display text-3xl md:text-4xl font-extrabold tracking-tight text-(--color-text)"
+          >
+            Player Data Playbook
+          </h1>
+          <p class="font-mono text-xs text-(--color-text-muted) mt-1">
+            // HOW WE BLEND YAHOO, MLB, FANGRAPHS & VEGAS SIGNALS
+          </p>
+        </div>
+
+        <section>
+          <p class="text-sm text-(--color-text-muted) leading-relaxed">
+            Moose Sports Empire is a baseball nerd&#39;s laboratory: we marry
+            official Yahoo fantasy feeds with MLB tracking data, FanGraphs
+            projections, Statcast expected stats, and matchup intel from Vegas
+            markets. Below is a transparent rundown of every source that flows
+            into the Team Bench page and how it shapes the values you see.
+          </p>
+        </section>
+
+        <section class="space-y-6">
+          <h2
+            class="font-display text-2xl font-extrabold tracking-tight text-(--color-text)"
+          >
+            Data Sources We Trust
+          </h2>
+          <div class="space-y-6">
+            <div
+              class="card p-5 space-y-3"
+            >
+              <p
+                class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-commissioner)"
+              >
+                Yahoo Fantasy Stats & Injuries
+              </p>
+              <h3 class="font-display text-lg font-extrabold text-(--color-text)">
+                In-Season StatLine Engine
+              </h3>
+              <p class="text-sm text-(--color-text-muted) leading-relaxed">
+                Daily box scores, roster positions, and official injury tags
+                come straight from Yahoo. We aggregate counting stats (R, HR,
+                RBI, SB, W, SV, K, etc.) plus ratio components (AVG, ERA, WHIP)
+                inside the <code class="font-mono text-xs bg-(--color-surface-inset) px-1.5 py-0.5 rounded-sm">stat_line</code> table.
+              </p>
+              <ul
+                class="space-y-1 text-sm text-(--color-text-muted) leading-relaxed list-disc pl-5"
+              >
+                <li>
+                  Fresh stats fuel the <strong>season</strong> z-scores once real
+                  games are underway.
+                </li>
+                <li>
+                  Injury strings (DTD, IL10, IL60, OUT) seed our injury-weight
+                  multiplier.
+                </li>
+              </ul>
+              <p class="font-mono text-[0.6rem] text-(--color-text-muted)">
+                Used for: Season valuations, roster eligibility, live injury
+                badges.
+              </p>
+            </div>
+
+            <div
+              class="card p-5 space-y-3"
+            >
+              <p
+                class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-commissioner)"
+              >
+                FanGraphs Projections
+              </p>
+              <h3 class="font-display text-lg font-extrabold text-(--color-text)">
+                Projection Baselines
+              </h3>
+              <p class="text-sm text-(--color-text-muted) leading-relaxed">
+                Before stat samples stabilize (or for prospects with limited
+                run), we backfill with FanGraphs projected lines. Every player
+                keeps a <code class="font-mono text-xs bg-(--color-surface-inset) px-1.5 py-0.5 rounded-sm">projection_baseline</code> record so nobody gets stranded
+                at zero.
+              </p>
+              <ul
+                class="space-y-1 text-sm text-(--color-text-muted) leading-relaxed list-disc pl-5"
+              >
+                <li>
+                  Category mapping keeps Yahoo&#39;s labels aligned with FG keys
+                  (e.g., K → SO).
+                </li>
+                <li>
+                  Once real stats exist, projections only fill gaps for missing
+                  categories.
+                </li>
+              </ul>
+              <p class="font-mono text-[0.6rem] text-(--color-text-muted)">
+                Used for: Early-season stability, bench depth scouting.
+              </p>
+            </div>
+
+            <div
+              class="card p-5 space-y-3"
+            >
+              <p
+                class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-commissioner)"
+              >
+                MLB + Statcast
+              </p>
+              <h3 class="font-display text-lg font-extrabold text-(--color-text)">
+                Probable Starters &amp; Expected Skill
+              </h3>
+              <p class="text-sm text-(--color-text-muted) leading-relaxed">
+                We ping the MLB Stats API for the next week of games to learn
+                which pitchers are lined up for one or two starts. On the skills
+                side, Statcast xwOBA (hitters) and xERA (pitchers) ride
+                alongside value snapshots to surface underlying quality.
+              </p>
+              <ul
+                class="space-y-1 text-sm text-(--color-text-muted) leading-relaxed list-disc pl-5"
+              >
+                <li>
+                  2-start SPs earn a hefty schedule multiplier in the <strong
+                    >next 7</strong
+                  > model.
+                </li>
+                <li>
+                  xStats display in the Bench table so you can sniff regression
+                  in or out.
+                </li>
+              </ul>
+              <p class="font-mono text-[0.6rem] text-(--color-text-muted)">
+                Used for: Next-week boosts, xStat columns.
+              </p>
+            </div>
+
+            <div
+              class="card p-5 space-y-3"
+            >
+              <p
+                class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-commissioner)"
+              >
+                Vegas &amp; Odds APIs
+              </p>
+              <h3 class="font-display text-lg font-extrabold text-(--color-text)">
+                Matchup Intelligence
+              </h3>
+              <p class="text-sm text-(--color-text-muted) leading-relaxed">
+                The Odds API provides implied win probabilities for every MLB
+                club. We convert that into a matchup multiplier so hot favorites
+                get a nudge and heavy underdogs cool off a touch.
+              </p>
+              <ul
+                class="space-y-1 text-sm text-(--color-text-muted) leading-relaxed list-disc pl-5"
+              >
+                <li>Win ≥ 65% → 1.15x bump, Win ≤ 35% → 0.85x drag.</li>
+                <li>
+                  Applied only to <strong>next 7</strong> valuations, when schedule
+                  context matters most.
+                </li>
+              </ul>
+              <p class="font-mono text-[0.6rem] text-(--color-text-muted)">
+                Used for: Matchup multipliers (GamblingService).
+              </p>
+            </div>
+
+            <div
+              class="card p-5 space-y-3"
+            >
+              <p
+                class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-commissioner)"
+              >
+                Yahoo Percent-Owned
+              </p>
+              <h3 class="font-display text-lg font-extrabold text-(--color-text)">
+                Roster % &amp; Trend Pulse
+              </h3>
+              <p class="text-sm text-(--color-text-muted) leading-relaxed">
+                A nightly cron hits Yahoo&#39;s <code class="font-mono text-xs bg-(--color-surface-inset) px-1.5 py-0.5 rounded-sm">percent_owned</code> endpoint
+                in batches of 25 players. We stamp the day&#39;s roster percentage
+                onto each snapshot and compare it to the mark three days ago to derive
+                the trend value shown on the Bench table.
+              </p>
+              <ul
+                class="space-y-1 text-sm text-(--color-text-muted) leading-relaxed list-disc pl-5"
+              >
+                <li>
+                  Positive trend = managers everywhere are adding the player.
+                </li>
+                <li>
+                  Zero trend = stable ownership, usually veterans in secure
+                  roles.
+                </li>
+              </ul>
+              <p class="font-mono text-[0.6rem] text-(--color-text-muted)">
+                Used for: Rost% column + +/- sparkline.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="space-y-6">
+          <h2
+            class="font-display text-2xl font-extrabold tracking-tight text-(--color-text)"
+          >
+            How We Calculate Value
+          </h2>
+          <div class="space-y-6">
+            <div
+              class="card p-5 space-y-3"
+            >
+              <p class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-commissioner)">
+                Pipeline Overview
+              </p>
+              <ol class="space-y-3 text-sm text-(--color-text-muted) leading-relaxed list-decimal pl-5">
+                <li>
+                  <strong class="text-(--color-text)">Assemble player profiles.</strong> We merge Yahoo stat totals
+                  with FanGraphs projections (for missing data) and include injury
+                  status, Yahoo rank, Statcast xStats, and schedule/matchup tags.
+                </li>
+                <li>
+                  <strong class="text-(--color-text)">Convert each stat to a z-score.</strong> For every Yahoo
+                  category a league tracks, we compute
+                  <code class="font-mono text-xs bg-(--color-surface-inset) px-1.5 py-0.5 rounded-sm">z = (player - mean) / stdev</code>. Negative stats (ERA,
+                  WHIP) get inverted so lower is better.
+                </li>
+                <li>
+                  <strong class="text-(--color-text)">Blend into a composite.</strong> We take the mean of all
+                  category z-scores to form a base composite. If a player has zero
+                  data sources, we lean on their Yahoo rank to avoid lumping prospects
+                  at 0.00.
+                </li>
+                <li>
+                  <strong class="text-(--color-text)">Adjust for context.</strong>
+                  <ul class="mt-1 space-y-1 list-disc pl-5">
+                    <li>
+                      <em>Season Value:</em> composite × injury_weight (based on status).
+                    </li>
+                    <li>
+                      <em>Next 7 Value:</em> (1 + composite) × injury_weight × schedule_multiplier
+                      × matchup_multiplier.
+                    </li>
+                  </ul>
+                </li>
+                <li>
+                  <strong class="text-(--color-text)">Rank + store snapshots.</strong> We sort composite values
+                  to assign our internal rank, pair it with the latest Yahoo rank,
+                  then persist everything in <code class="font-mono text-xs bg-(--color-surface-inset) px-1.5 py-0.5 rounded-sm">player_value_snapshot</code> for
+                  the Bench API to read.
+                </li>
+              </ol>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div
+                class="card p-5 space-y-3"
+              >
+                <p
+                  class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-commissioner)"
+                >
+                  Season Value
+                </p>
+                <h3 class="font-display text-lg font-extrabold text-(--color-text)">
+                  Long View, Real Stats
+                </h3>
+                <ul
+                  class="space-y-1 text-sm text-(--color-text-muted) leading-relaxed list-disc pl-5"
+                >
+                  <li>Powered primarily by accumulated Yahoo stat lines.</li>
+                  <li>
+                    Projections only fill a category if you don&#39;t have real
+                    data yet.
+                  </li>
+                  <li>
+                    Injury weight table trims value: DTD=0.6, IL10=0.2,
+                    IL60/OUT=0.0.
+                  </li>
+                  <li>
+                    Displayed as the green/red number in the season column.
+                  </li>
+                </ul>
+              </div>
+
+              <div class="card p-5 space-y-3">
+                <p
+                  class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-commissioner)"
+                >
+                  Next 7 Value
+                </p>
+                <h3 class="font-display text-lg font-extrabold text-(--color-text)">
+                  Short Burst Forecast
+                </h3>
+                <ul
+                  class="space-y-1 text-sm text-(--color-text-muted) leading-relaxed list-disc pl-5"
+                >
+                  <li>
+                    Starts with the same composite backbone as season value.
+                  </li>
+                  <li>2-start SP boost: up to 1.8× schedule multiplier.</li>
+                  <li>
+                    Missed games adjustment: (7 - projected DNP) ÷ 7 when we
+                    know absences.
+                  </li>
+                  <li>
+                    Vegas matchup multiplier to reflect soft vs. brutal weeks.
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="space-y-6">
+          <h2
+            class="font-display text-2xl font-extrabold tracking-tight text-(--color-text)"
+          >
+            Quick Hits &amp; Notes
+          </h2>
+          <div class="card p-5 space-y-4 text-sm text-(--color-text-muted) leading-relaxed">
+            <p>
+              <strong class="text-(--color-text)">Why can a low Yahoo rank still grade well?</strong> If a player
+              is just back from the IL, our composite values spike as soon as their
+              per-category z-scores climb, even before Yahoo updates their public
+              rank.
+            </p>
+            <p>
+              <strong class="text-(--color-text)">What if a player has no data anywhere?</strong> They land at
+              a neutral 0.0 composite but still inherit our injury weighting and show
+              up on the roster list so you know the slot is occupied.
+            </p>
+            <p>
+              <strong class="text-(--color-text)">Why do some numbers turn yellow?</strong> BenchView highlights
+              stale data when the snapshot timestamps are more than 24 hours old,
+              reminding you to kick off a recompute if needed.
+            </p>
+          </div>
+        </section>
+
+        <section class="space-y-6">
+          <h2
+            class="font-display text-2xl font-extrabold tracking-tight text-(--color-text)"
+          >
+            Glossary for Data Nerds
+          </h2>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div
+              class="card p-5 space-y-2"
+            >
+              <p
+                class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-commissioner)"
+              >
+                Composite Value
+              </p>
+              <p class="text-sm text-(--color-text-muted) leading-relaxed">
+                Average of every active category z-score after directional
+                fixes. Positive = above-league-average contributor.
+              </p>
+            </div>
+            <div
+              class="card p-5 space-y-2"
+            >
+              <p
+                class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-commissioner)"
+              >
+                Injury Weight
+              </p>
+              <p class="text-sm text-(--color-text-muted) leading-relaxed">
+                Scalar derived from Yahoo status or projected missed games.
+                Multiplies straight into the composite for realism.
+              </p>
+            </div>
+            <div
+              class="card p-5 space-y-2"
+            >
+              <p
+                class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-commissioner)"
+              >
+                Roster Trend
+              </p>
+              <p class="text-sm text-(--color-text-muted) leading-relaxed">
+                Today&#39;s percent-owned minus the mark three days prior. Spot
+                emerging pickups or dead roster spots instantly.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <div
+          class="mt-10 pt-6 border-t border-(--color-border-subtle) text-center"
+        >
+          <p
+            class="font-display text-lg font-extrabold text-(--color-text) mb-1"
+          >
+            Still curious?
+          </p>
+          <p class="text-sm text-(--color-text-muted)">
+            Ping the commish channel or open an issue — we love talking shop.
+          </p>
+        </div>
+      </div>
+      <Footer client:load />
+    </main>
+  </div>
+</BaseLayout>

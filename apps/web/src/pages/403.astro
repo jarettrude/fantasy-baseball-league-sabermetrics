@@ -1,0 +1,94 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+const title = "403 // Access Forbidden";
+const description =
+  "Your current security clearance is insufficient for this sector.";
+const suggestion =
+  "Use an authorized identifier or request elevation from the commissioner.";
+const code = "403";
+---
+
+<BaseLayout title={title} noindex={true}>
+  <div
+    class="relative flex min-h-screen items-center justify-center px-page py-16"
+  >
+    <!-- Standard Grid Background -->
+    <div
+      class="absolute inset-0 opacity-[0.03] pointer-events-none grid-bg"
+    >
+    </div>
+
+    <div class="relative w-full max-w-md animate-fade-in">
+      <div class="card p-8 text-center space-y-6">
+        <div class="flex flex-col items-center gap-3">
+          <div
+            class="flex h-14 w-14 items-center justify-center rounded-full bg-(--color-danger-muted) border border-(--color-danger)"
+          >
+            <svg
+              class="h-7 w-7 text-(--color-danger)"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="3"
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              ></path>
+            </svg>
+          </div>
+          <span
+            class="font-mono text-xs font-bold tracking-widest uppercase text-(--color-text-muted)"
+          >
+            MSE // SECURITY
+          </span>
+        </div>
+
+        <h1
+          class="font-display text-2xl font-extrabold tracking-tight text-(--color-text)"
+        >
+          {title}
+        </h1>
+
+        <div class="space-y-3">
+          <p
+            class="font-mono text-xs text-(--color-text-muted) leading-relaxed"
+          >
+            // {description}
+          </p>
+          <div class="h-px bg-(--color-border)"></div>
+          <p
+            class="text-sm text-(--color-text-secondary) leading-relaxed"
+          >
+            {suggestion}
+          </p>
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-3 justify-center">
+          <a
+            href="/login"
+            class="btn btn-primary"
+          >
+            RE-AUTHORIZE // LOGIN
+          </a>
+          <a
+            href="/"
+            class="btn btn-secondary"
+          >
+            EXIT TO HUB
+          </a>
+        </div>
+
+        <div class="pt-4 border-t border-(--color-border-subtle)">
+          <p
+            class="font-mono text-[0.6rem] tracking-wide text-(--color-text-muted)"
+          >
+            SYSTEM IDENTIFIER: {code}_SEC_LEVEL_VIOLATION
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</BaseLayout>

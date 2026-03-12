@@ -1,0 +1,115 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+// Astro 4.10+ and 5.0+ provide error info in SSR mode if 500.astro is present
+interface Props {
+  error: unknown;
+}
+
+const { error } = Astro.props;
+const title = "500 // Internal Error";
+const description =
+  "The Moose Sports Empire engine has encountered a critical anomaly.";
+const suggestion =
+  "The technical division has been alerted. Attempt a manual re-calibration.";
+const code = "500";
+
+// In production, we don't want to show the full error stack to users for security
+// but we might want to log it serverside.
+if (error) {
+  console.error(`[500 Page Error]:`, error);
+}
+---
+
+<BaseLayout title={title} noindex={true}>
+  <div
+    class="relative flex min-h-screen items-center justify-center px-page py-16"
+  >
+    <!-- Standard Grid Background -->
+    <div
+      class="absolute inset-0 opacity-[0.03] pointer-events-none grid-bg"
+    >
+    </div>
+
+    <div class="relative w-full max-w-md animate-fade-in">
+      <div class="card p-8 text-center space-y-6">
+        <div class="flex flex-col items-center gap-3">
+          <div
+            class="flex h-14 w-14 items-center justify-center rounded-full bg-(--color-danger-muted) border border-(--color-danger)"
+          >
+            <svg
+              class="h-7 w-7 text-(--color-danger)"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="3"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              ></path>
+            </svg>
+          </div>
+          <span
+            class="font-mono text-xs font-bold tracking-widest uppercase text-(--color-danger)"
+          >
+            CRITICAL // FAILURE
+          </span>
+        </div>
+
+        <h1
+          class="font-display text-2xl font-extrabold tracking-tight text-(--color-text)"
+        >
+          {title}
+        </h1>
+
+        <div class="space-y-3">
+          <p
+            class="font-mono text-xs text-(--color-text-muted) leading-relaxed"
+          >
+            // {description}
+          </p>
+          <div class="h-px bg-(--color-border)"></div>
+          <p
+            class="text-sm text-(--color-text-secondary) leading-relaxed"
+          >
+            {suggestion}
+          </p>
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-3 justify-center">
+          <button
+            onclick="window.location.reload()"
+            class="btn btn-primary"
+          >
+            RE-CALIBRATE // REFRESH
+          </button>
+          <a
+            href="/"
+            class="btn btn-secondary"
+          >
+            EXIT TO HUB
+          </a>
+        </div>
+
+        <div class="pt-4 border-t border-(--color-border-subtle)">
+          <p
+            class="font-mono text-[0.6rem] tracking-wide text-(--color-text-muted)"
+          >
+            SYSTEM IDENTIFIER: {code}_CORE_FAILURE_PROTOCOL
+          </p>
+          {
+            error && import.meta.env.DEV && (
+              <pre class="mt-4 text-left text-[0.65rem] p-3 rounded-sm bg-(--color-surface-inset) border border-(--color-border) font-mono text-(--color-danger) overflow-x-auto">
+                {error instanceof Error
+                  ? error.stack
+                  : JSON.stringify(error, null, 2)}
+              </pre>
+            )
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+</BaseLayout>
