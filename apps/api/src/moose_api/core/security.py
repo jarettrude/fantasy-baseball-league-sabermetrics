@@ -13,7 +13,7 @@ from typing import Any
 
 from cryptography.fernet import Fernet
 from fastapi import Cookie, Depends, HTTPException, Request, status
-from jose import JWTError, jwt
+from jwt import PyJWT as jwt, InvalidTokenError as JWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
