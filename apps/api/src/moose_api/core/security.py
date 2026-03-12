@@ -11,9 +11,9 @@ import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import jwt
 from cryptography.fernet import Fernet
 from fastapi import Cookie, Depends, HTTPException, Request, status
-from jwt import PyJWT as jwt, InvalidTokenError as JWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -58,7 +58,7 @@ def decode_access_token(token: str) -> dict[str, Any]:
     try:
         payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
         return payload
-    except JWTError as e:
+    except jwt.exceptions.PyJWTError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
