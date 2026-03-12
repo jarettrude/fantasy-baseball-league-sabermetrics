@@ -42,13 +42,11 @@ mkdir -p secrets
 ### Step 2: Choose Your Setup
 
 #### Production Deployment (Recommended for VPS)
-Use the production template designed for Traefik:
+Use the production docker-compose file:
 
 ```bash
-# Copy production template and customize
-cp docker-compose.prod.yml docker-compose.yml
-
-# Edit the production file with your domain and settings
+# The production docker-compose.yml is already set up
+# Edit the file with your domain and settings
 nano docker-compose.yml
 ```
 
@@ -56,8 +54,8 @@ nano docker-compose.yml
 If you just want to test locally first:
 
 ```bash
-# Use the existing dev docker-compose.yml
-# This includes Traefik with HTTPS for Yahoo OAuth
+# Use the development docker-compose file
+docker compose -f docker-compose.dev.yml up -d --build
 ```
 
 ### Step 3: Setup Local Traefik Certificates (Development Only)
@@ -158,15 +156,40 @@ echo "your_commissioner_yahoo_guid" > ${DOCKER_DIR}/secrets/moose_sports_empire/
 echo "secure_db_password" > ${DOCKER_DIR}/secrets/moose_sports_empire/db_password
 ```
 
+### Step 5.5: Create Production Environment File
+
+Create a `.env` file in the root directory of your moose_sports_empire clone:
+
+```bash
+# Create .env file for docker-compose
+nano .env
+```
+
+Add the following content (adjust paths for your setup):
+
+```bash
+# Docker directory paths
+DOCKER_DIR=/path/to/your/docker/setup
+```
+
+**Why this is needed**: The production `docker-compose.yml` uses `${DOCKER_DIR}` variables for volume paths and secret locations. Creating this `.env` file ensures docker-compose can automatically resolve these paths without requiring manual exports each time you run commands.
+
+**Example setup**:
+```bash
+# If your docker setup is at /opt/docker
+DOCKER_DIR=/opt/docker
+
+# The full paths will resolve to:
+# /opt/docker/appdata/moose_sports_empire/postgres
+# /opt/docker/secrets/moose_sports_empire/yahoo_client_id
+# etc.
+```
+
 ### Step 6: Deploy!
 
 #### Production Deployment:
 ```bash
-# Set up environment variables for production
-export DOCKER_DIR=/path/to/your/docker/setup
-export DOCKER_DIR=$DOCKER_DIR/appdata/moose_sports_empire
-
-# Build and start all services
+# Build and start all services (.env file provides DOCKER_DIR)
 docker compose up -d --build
 
 # Watch the logs to see migrations run
@@ -175,11 +198,11 @@ docker compose logs -f api
 
 #### Development Deployment:
 ```bash
-# Build and start all services (includes Traefik HTTPS)
-docker compose up -d --build
+# Build and start all services using dev compose file
+docker compose -f docker-compose.dev.yml up -d --build
 
 # Watch the logs to see migrations run
-docker compose logs -f api
+docker compose -f docker-compose.dev.yml logs -f api
 
 # Access at https://localhost (Traefik handles HTTPS)
 ```
@@ -194,7 +217,8 @@ That's it! Your app should be live at your domain (production) or localhost (dev
 
 | Feature | Development | Production |
 |---------|-------------|------------|
-| **Docker Compose** | `docker-compose.yml` | `docker-compose.prod.yml` |
+| **Docker Compose** | `docker-compose.dev.yml` | `docker-compose.yml` |
+| **Dockerfile** | `Dockerfile.dev` | `Dockerfile` |
 | **Database** | Simple credentials (moose/moose) | Secure password via secrets |
 | **Network** | Traefik HTTPS (localhost) | Traefik reverse proxy |
 | **Volumes** | Hot reload mounts | Persistent data only |
@@ -237,7 +261,7 @@ http:
 
 ### Environment Variables Reference
 
-#### Development (.env or docker-compose.yml)
+#### Development (.env or docker-compose.dev.yml)
 ```yaml
 WEB_ORIGIN: https://localhost
 PUBLIC_API_URL: https://localhost
@@ -246,7 +270,7 @@ YAHOO_REDIRECT_URI: https://localhost/callback
 
 **Note**: Development uses Traefik with HTTPS for Yahoo OAuth compatibility
 
-#### Production (docker-compose.prod.yml)
+#### Production (docker-compose.yml)
 ```yaml
 WEB_ORIGIN: https://your-domain.com
 PUBLIC_API_URL: https://api.your-domain.com

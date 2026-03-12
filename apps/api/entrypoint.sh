@@ -18,7 +18,7 @@ done
 
 # Run migrations (uses Pydantic settings which reads Docker secrets)
 echo "Running database migrations..."
-alembic upgrade head
+/app/.venv/bin/alembic upgrade head
 
 # Start application (uses Pydantic settings which reads Docker secrets)
 echo "Starting application..."

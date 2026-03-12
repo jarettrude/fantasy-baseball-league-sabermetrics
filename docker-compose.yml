@@ -1,132 +1,125 @@
-# Development Docker Compose
-# This file is for LOCAL DEVELOPMENT ONLY
-# For production deployment, use docker-compose.prod.yml as a template
-# 
-# Development features:
-# - Local Traefik with HTTPS for Yahoo OAuth
-# - Hot reload volume mounts
-# - Simple database credentials (not for production)
-# - Self-signed certificates for HTTPS
+# Production Docker Compose Template
+# Copy this file to your production environment and customize the variables
 
 services:
-  traefik:
-    image: traefik:v3.6.8
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./infra/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
-      - ./infra/traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
-      - ./infra/traefik/certs:/certs:ro
-    networks:
-      - default
-    depends_on:
-      - api
-      - web
-
   db:
+    container_name: moose-sports-db
     image: postgres:18-alpine
-    restart: unless-stopped
+    restart: always
     environment:
-      POSTGRES_USER: moose
-      POSTGRES_PASSWORD: moose
       POSTGRES_DB: moose_empire
+      POSTGRES_USER: moose
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
       PGDATA: /var/lib/postgresql/data/pgdata
+    secrets:
+      - db_password
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - ${DOCKER_DIR}/appdata/moose_sports_empire/postgres:/var/lib/postgresql/data
+    networks:
+      - moose_sports_internal
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U moose -d moose_empire"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
 
   redis:
+    container_name: moose-sports-redis
     image: redis:8.0.3-alpine
-    restart: unless-stopped
+    restart: always
+    command: ["redis-server", "--save", "60 1", "--loglevel", "warning"]
     volumes:
-      - redisdata:/data
+      - ${DOCKER_DIR}/appdata/moose_sports_empire/redis:/data
+    networks:
+      - moose_sports_internal
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
 
   api:
+    container_name: moose-sports-api
     build:
-      context: .
+      context: ${DOCKER_DIR}/sources/moose_sports_empire
       dockerfile: apps/api/Dockerfile
       target: api
+    image: moose_sports_api:latest
     restart: unless-stopped
     environment:
-      APP_ENV: ${APP_ENV:-development}
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      WEB_ORIGIN: ${WEB_ORIGIN:-https://localhost}
-      LOCAL_TIMEZONE: ${LOCAL_TIMEZONE:-America/Vancouver}
-      RECAP_GENERATION_TIME: ${RECAP_GENERATION_TIME:-10:00}
-      DEMO_MODE: ${DEMO_MODE:-false}
-      YAHOO_REDIRECT_URI: ${YAHOO_REDIRECT_URI:-https://localhost/callback}
-      DATABASE_URL: postgresql+asyncpg://moose:moose@db:5432/moose_empire
+      APP_ENV: production
+      LOG_LEVEL: INFO
+      WEB_ORIGIN: https://your-domain.com
+      LOCAL_TIMEZONE: America/Vancouver
+      RECAP_GENERATION_TIME: "10:00"
+      DEMO_MODE: "false"
+      YAHOO_REDIRECT_URI: https://your-domain.com/callback
       REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: postgresql+asyncpg://moose:password@db:5432/moose_empire
+    volumes:
+      - ${DOCKER_DIR}/sources/moose_sports_empire/prompts:/prompts:rw
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - ./apps/api/src:/app/src
-      - ./apps/api/alembic:/app/alembic
-      - ./prompts:/prompts
+    secrets:
+      - yahoo_league_id
+      - yahoo_client_id
+      - yahoo_client_secret
+      - commissioner_yahoo_guid
+      - jwt_secret_key
+      - fernet_key
+      - google_gemini_api_key
+      - openrouter_api_key
+      - the_odds_api_key
+      - session_secret
+      - csrf_secret
+      - db_password
     networks:
-      - default
+      - proxy
+      - moose_sports_internal
     expose:
       - "8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.moose-api-dev.entrypoints=websecure"
-      - "traefik.http.routers.moose-api-dev.rule=Host(`localhost`) && PathPrefix(`/api`)"
-      - "traefik.http.routers.moose-api-dev.tls=true"
-      - "traefik.http.services.moose-api-dev.loadbalancer.server.port=8000"
-    secrets:
-      - yahoo_league_id
-      - yahoo_client_id
-      - yahoo_client_secret
-      - commissioner_yahoo_guid
-      - jwt_secret_key
-      - fernet_key
-      - google_gemini_api_key
-      - openrouter_api_key
-      - the_odds_api_key
-      - session_secret
-      - csrf_secret
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.moose-api.entrypoints=websecure"
+      - "traefik.http.routers.moose-api.rule=Host(`api.your-domain.com`)"
+      - "traefik.http.routers.moose-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.moose-api.loadbalancer.server.port=8000"
+      - "traefik.http.routers.moose-api.middlewares=secure-headers@file"
 
   worker:
+    container_name: moose-sports-worker
     build:
-      context: .
+      context: ${DOCKER_DIR}/sources/moose_sports_empire
       dockerfile: apps/api/Dockerfile
       target: worker
+    image: moose_sports_worker:latest
+    volumes:
+      - ${DOCKER_DIR}/sources/moose_sports_empire/prompts:/prompts:ro
     restart: unless-stopped
     environment:
-      APP_ENV: ${APP_ENV:-development}
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      LOCAL_TIMEZONE: ${LOCAL_TIMEZONE:-America/Vancouver}
-      RECAP_GENERATION_TIME: ${RECAP_GENERATION_TIME:-10:00}
-      DEMO_MODE: ${DEMO_MODE:-false}
-      YAHOO_REDIRECT_URI: ${YAHOO_REDIRECT_URI:-https://localhost/callback}
-      DATABASE_URL: postgresql+asyncpg://moose:moose@db:5432/moose_empire
+      APP_ENV: production
+      LOG_LEVEL: INFO
+      LOCAL_TIMEZONE: America/Vancouver
+      RECAP_GENERATION_TIME: "10:00"
+      DEMO_MODE: "false"
+      YAHOO_REDIRECT_URI: https://your-domain.com/callback
       REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: postgresql+asyncpg://moose:password@db:5432/moose_empire
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - ./apps/api/src:/app/src
-      - ./prompts:/prompts
-    networks:
-      - default
-    labels:
-      - "traefik.enable=false"
     secrets:
       - yahoo_league_id
       - yahoo_client_id
@@ -139,54 +132,78 @@ services:
       - the_odds_api_key
       - session_secret
       - csrf_secret
+      - db_password
+    networks:
+      - moose_sports_internal
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c 'import redis; import os; r = redis.from_url(os.getenv(\"REDIS_URL\", \"redis://redis:6379/0\")); r.ping()' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   web:
+    container_name: moose-sports-web
     build:
-      context: .
+      context: ${DOCKER_DIR}/sources/moose_sports_empire
       dockerfile: apps/web/Dockerfile
-    restart: unless-stopped
+      args:
+        - PUBLIC_API_URL=https://api.your-domain.com
+    image: moose_sports_web:latest
+    restart: always
     environment:
-      PUBLIC_API_URL: ${PUBLIC_API_URL:-https://localhost}
+      - HOST=0.0.0.0
+      - PORT=4321
+      - PUBLIC_API_URL=https://api.your-domain.com
     depends_on:
-      - api
-    volumes:
-      - ./apps/web/src:/app/src
-      - ./apps/web/public:/app/public
+      api:
+        condition: service_healthy
     networks:
-      - default
+      - proxy
     expose:
       - "4321"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e 'require(\"http\").get(\"http://localhost:4321/\", (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on(\"error\", () => process.exit(1))'"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.moose-web-dev.entrypoints=websecure"
-      - "traefik.http.routers.moose-web-dev.rule=Host(`localhost`)"
-      - "traefik.http.routers.moose-web-dev.tls=true"
-      - "traefik.http.services.moose-web-dev.loadbalancer.server.port=4321"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.moose-web.entrypoints=websecure"
+      - "traefik.http.routers.moose-web.rule=Host(`your-domain.com`) || Host(`www.your-domain.com`)"
+      - "traefik.http.routers.moose-web.tls.certresolver=letsencrypt"
+      - "traefik.http.services.moose-web.loadbalancer.server.port=4321"
+      - "traefik.http.routers.moose-web.middlewares=secure-headers@file"
+
+networks:
+  proxy:
+    external: true
+  moose_sports_internal:
+    driver: bridge
 
 secrets:
   yahoo_league_id:
-    file: ./secrets/yahoo_league_id.txt
+    file: ${DOCKER_DIR}/secrets/moose_sports_empire/yahoo_league_id
   yahoo_client_id:
-    file: ./secrets/yahoo_client_id.txt
+    file: ${DOCKER_DIR}/secrets/moose_sports_empire/yahoo_client_id
   yahoo_client_secret:
-    file: ./secrets/yahoo_client_secret.txt
+    file: ${DOCKER_DIR}/secrets/moose_sports_empire/yahoo_client_secret
   commissioner_yahoo_guid:
-    file: ./secrets/commissioner_yahoo_guid.txt
+    file: ${DOCKER_DIR}/secrets/moose_sports_empire/commissioner_yahoo_guid
   jwt_secret_key:
-    file: ./secrets/jwt_secret_key.txt
+    file: ${DOCKER_DIR}/secrets/moose_sports_empire/jwt_secret_key
   fernet_key:
-    file: ./secrets/fernet_key.txt
+    file: ${DOCKER_DIR}/secrets/moose_sports_empire/fernet_key
   google_gemini_api_key:
-    file: ./secrets/google_gemini_api_key.txt
+    file: ${DOCKER_DIR}/secrets/moose_sports_empire/google_gemini_api_key
   openrouter_api_key:
-    file: ./secrets/openrouter_api_key.txt
+    file: ${DOCKER_DIR}/secrets/moose_sports_empire/openrouter_api_key
   the_odds_api_key:
-    file: ./secrets/the_odds_api_key.txt
+    file: ${DOCKER_DIR}/secrets/moose_sports_empire/the_odds_api_key
   session_secret:
-    file: ./secrets/session_secret.txt
+    file: ${DOCKER_DIR}/secrets/moose_sports_empire/session_secret
   csrf_secret:
-    file: ./secrets/csrf_secret.txt
-
-volumes:
-  pgdata:
-  redisdata:
+    file: ${DOCKER_DIR}/secrets/moose_sports_empire/csrf_secret
+  db_password:
+    file: ${DOCKER_DIR}/secrets/moose_sports_empire/db_password

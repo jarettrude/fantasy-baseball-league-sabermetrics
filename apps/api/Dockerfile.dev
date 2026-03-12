@@ -1,5 +1,5 @@
-# --- Base Stage ---
-FROM python:3.12-slim AS base
+# --- Development Stage ---
+FROM python:3.12-slim AS dev
 
 WORKDIR /app
 
@@ -13,11 +13,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install uv for fast dependency management
 RUN pip install --no-cache-dir uv
 
-# Copy only requirements files first for better caching
+# Copy requirements file
 COPY apps/api/pyproject.toml ./
 COPY apps/api/uv.lock* ./
-# Install ONLY production dependencies
-RUN uv sync --no-dev
+# Install ALL dependencies (including dev)
+RUN uv sync --all-groups
 
 # Copy source and other necessary files
 COPY apps/api/ ./
@@ -29,17 +29,15 @@ RUN chmod +x /app/entrypoint.sh
 # Environment variables
 ENV PYTHONPATH=/app/src
 ENV PYTHONUNBUFFERED=1
-ENV PATH="/root/.local/bin:/app/.venv/bin:$PATH"
 
-# --- API Stage ---
-FROM base AS api
+# --- API Development Stage ---
+FROM dev AS api-dev
 EXPOSE 8000
 ENTRYPOINT ["/app/entrypoint.sh"]
-# Use uvicorn from venv
-CMD ["/app/.venv/bin/uvicorn", "moose_api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Use uvicorn with --reload from venv
+CMD ["/app/.venv/bin/uvicorn", "moose_api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
-# --- Worker Stage ---
-FROM base AS worker
+# --- Worker Development Stage ---
+FROM dev AS worker-dev
 # Use arq from venv
 CMD ["/app/.venv/bin/arq", "moose_api.worker.WorkerSettings"]
-

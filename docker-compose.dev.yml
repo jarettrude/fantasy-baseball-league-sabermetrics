@@ -1,0 +1,192 @@
+# Development Docker Compose
+# This file is for LOCAL DEVELOPMENT ONLY
+# For production deployment, use docker-compose.prod.yml as a template
+# 
+# Development features:
+# - Local Traefik with HTTPS for Yahoo OAuth
+# - Hot reload volume mounts
+# - Simple database credentials (not for production)
+# - Self-signed certificates for HTTPS
+
+services:
+  traefik:
+    image: traefik:v3.6.8
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./infra/traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+      - ./infra/traefik/certs:/certs:ro
+    networks:
+      - default
+    depends_on:
+      - api
+      - web
+
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: moose
+      POSTGRES_PASSWORD: moose
+      POSTGRES_DB: moose_empire
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moose -d moose_empire"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:8.0.3-alpine
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile.dev
+      target: api-dev
+    restart: unless-stopped
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      WEB_ORIGIN: ${WEB_ORIGIN:-https://localhost}
+      LOCAL_TIMEZONE: ${LOCAL_TIMEZONE:-America/Vancouver}
+      RECAP_GENERATION_TIME: ${RECAP_GENERATION_TIME:-10:00}
+      DEMO_MODE: ${DEMO_MODE:-false}
+      YAHOO_REDIRECT_URI: ${YAHOO_REDIRECT_URI:-https://localhost/callback}
+      DATABASE_URL: postgresql+asyncpg://moose:moose@db:5432/moose_empire
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./apps/api/src:/app/src
+      - ./apps/api/alembic:/app/alembic
+      - ./prompts:/prompts
+    networks:
+      - default
+    expose:
+      - "8000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.moose-api-dev.entrypoints=websecure"
+      - "traefik.http.routers.moose-api-dev.rule=Host(`localhost`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.moose-api-dev.tls=true"
+      - "traefik.http.services.moose-api-dev.loadbalancer.server.port=8000"
+    secrets:
+      - yahoo_league_id
+      - yahoo_client_id
+      - yahoo_client_secret
+      - commissioner_yahoo_guid
+      - jwt_secret_key
+      - fernet_key
+      - google_gemini_api_key
+      - openrouter_api_key
+      - the_odds_api_key
+      - session_secret
+      - csrf_secret
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile.dev
+      target: worker-dev
+    restart: unless-stopped
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOCAL_TIMEZONE: ${LOCAL_TIMEZONE:-America/Vancouver}
+      RECAP_GENERATION_TIME: ${RECAP_GENERATION_TIME:-10:00}
+      DEMO_MODE: ${DEMO_MODE:-false}
+      YAHOO_REDIRECT_URI: ${YAHOO_REDIRECT_URI:-https://localhost/callback}
+      DATABASE_URL: postgresql+asyncpg://moose:moose@db:5432/moose_empire
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./apps/api/src:/app/src
+      - ./prompts:/prompts
+    networks:
+      - default
+    labels:
+      - "traefik.enable=false"
+    secrets:
+      - yahoo_league_id
+      - yahoo_client_id
+      - yahoo_client_secret
+      - commissioner_yahoo_guid
+      - jwt_secret_key
+      - fernet_key
+      - google_gemini_api_key
+      - openrouter_api_key
+      - the_odds_api_key
+      - session_secret
+      - csrf_secret
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    environment:
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-https://localhost}
+    depends_on:
+      - api
+    volumes:
+      - ./apps/web/src:/app/src
+      - ./apps/web/public:/app/public
+    networks:
+      - default
+    expose:
+      - "4321"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.moose-web-dev.entrypoints=websecure"
+      - "traefik.http.routers.moose-web-dev.rule=Host(`localhost`)"
+      - "traefik.http.routers.moose-web-dev.tls=true"
+      - "traefik.http.services.moose-web-dev.loadbalancer.server.port=4321"
+
+secrets:
+  yahoo_league_id:
+    file: ./secrets/yahoo_league_id.txt
+  yahoo_client_id:
+    file: ./secrets/yahoo_client_id.txt
+  yahoo_client_secret:
+    file: ./secrets/yahoo_client_secret.txt
+  commissioner_yahoo_guid:
+    file: ./secrets/commissioner_yahoo_guid.txt
+  jwt_secret_key:
+    file: ./secrets/jwt_secret_key.txt
+  fernet_key:
+    file: ./secrets/fernet_key.txt
+  google_gemini_api_key:
+    file: ./secrets/google_gemini_api_key.txt
+  openrouter_api_key:
+    file: ./secrets/openrouter_api_key.txt
+  the_odds_api_key:
+    file: ./secrets/the_odds_api_key.txt
+  session_secret:
+    file: ./secrets/session_secret.txt
+  csrf_secret:
+    file: ./secrets/csrf_secret.txt
+
+volumes:
+  pgdata:
+  redisdata:
