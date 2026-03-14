@@ -8,10 +8,16 @@
 <script lang="ts">
   import logo from "../assets/mse_logo.svg";
   import { onMount } from "svelte";
-  import { fetchUser, getUser, logout } from "../lib/stores.svelte";
+  import {
+    fetchUser,
+    getIsLoading,
+    getUser,
+    logout,
+  } from "../lib/stores.svelte";
   import { api } from "../lib/api";
 
   let user = $derived(getUser());
+  let isLoading = $derived(getIsLoading());
   let menuOpen = $state(false);
   let demoMode = $state(false);
 
@@ -40,15 +46,22 @@
   <div
     class="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-page"
   >
-    <a
-      href="/"
-      class="flex items-center gap-2.5 group"
-    >
+    <a href="/" class="flex items-center gap-2.5 group">
       <img src={logo.src} alt="MSE Logo" class="h-8 w-8 rounded-sm" />
-      <span class="font-display text-sm font-bold tracking-tight text-(--color-text) group-hover:text-(--color-accent-amber) hidden sm:inline">Moose Sports Empire</span>
+      <span
+        class="font-display text-sm font-bold tracking-tight text-(--color-text) group-hover:text-(--color-accent-amber) hidden sm:inline"
+        >Moose Sports Empire</span
+      >
     </a>
 
-    {#if user}
+    {#if isLoading}
+      <div class="flex items-center gap-3">
+        <div
+          class="hidden md:block h-4 w-28 rounded bg-(--color-surface-raised)"
+        ></div>
+        <div class="h-8 w-20 rounded-sm bg-(--color-surface-raised)"></div>
+      </div>
+    {:else if user}
       <div class="hidden md:flex items-center gap-1">
         <a
           href="/dashboard"
@@ -85,8 +98,7 @@
           >{user.display_name}</span
         >
         {#if user.role === "commissioner"}
-          <span
-            class="badge badge-commissioner hidden lg:inline-flex"
+          <span class="badge badge-commissioner hidden lg:inline-flex"
             >Commissioner</span
           >
         {/if}
@@ -124,12 +136,7 @@
           class="px-3 py-1.5 rounded-sm font-mono text-xs font-semibold tracking-wide uppercase text-(--color-text-secondary) hover:text-(--color-text) hover:bg-(--color-surface-raised)"
           >FAQ</a
         >
-        <a
-          href="/login"
-          class="btn btn-primary"
-        >
-          Sign in with Yahoo
-        </a>
+        <a href="/login" class="btn btn-primary"> Sign in with Yahoo </a>
       </div>
     {/if}
   </div>

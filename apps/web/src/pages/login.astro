@@ -8,15 +8,11 @@ import LoginFlow from "../components/LoginFlow.svelte";
     class="relative flex min-h-screen items-center justify-center px-page py-16"
   >
     <!-- Dark grid background -->
-    <div
-      class="absolute inset-0 opacity-[0.03] pointer-events-none grid-bg"
-    >
+    <div class="absolute inset-0 opacity-[0.03] pointer-events-none grid-bg">
     </div>
 
     <div class="relative w-full max-w-sm animate-fade-in">
-      <div
-        class="card p-8 text-center space-y-6"
-      >
+      <div class="card p-8 text-center space-y-6">
         <div class="flex justify-center">
           <span
             class="inline-flex h-14 w-14 items-center justify-center rounded-sm bg-(--color-surface-raised) border border-(--color-border) font-display text-xl font-extrabold text-(--color-commissioner)"
@@ -29,7 +25,9 @@ import LoginFlow from "../components/LoginFlow.svelte";
         >
           Authorize Access
         </h1>
-        <p class="font-mono text-xs tracking-widest uppercase text-(--color-text-muted)">
+        <p
+          class="font-mono text-xs tracking-widest uppercase text-(--color-text-muted)"
+        >
           // CONNECT YAHOO FANTASY ACCOUNT
         </p>
         <LoginFlow client:load />

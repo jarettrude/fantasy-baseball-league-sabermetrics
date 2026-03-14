@@ -102,8 +102,8 @@ def _snapshot_to_response(snap: PlayerValueSnapshot | None, player: Player) -> P
         injury_status=player.injury_status,
         xwoba=snap.xwoba,
         xera=snap.xera,
-        roster_percent=snap.roster_percent,
-        roster_trend=snap.roster_trend,
+        roster_percent=float(snap.roster_percent) if snap.roster_percent is not None else None,
+        roster_trend=float(snap.roster_trend) if snap.roster_trend is not None else None,
     )
 
 
@@ -364,7 +364,7 @@ async def get_mappings(
 async def update_mapping(
     mapping_id: int,
     req: PlayerMappingUpdateRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_commissioner),
     db: AsyncSession = Depends(get_db),
 ):
     """Update a specific player mapping. Typically used by the commissioner to resolve ambiguity.
@@ -384,12 +384,6 @@ async def update_mapping(
     Raises:
         HTTPException: If user is not commissioner or mapping not found
     """
-    if current_user["role"] != "commissioner":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Commissioner access required",
-        )
-
     result = await db.execute(select(PlayerMapping).where(PlayerMapping.id == mapping_id))
     mapping = result.scalar_one_or_none()
     if not mapping:

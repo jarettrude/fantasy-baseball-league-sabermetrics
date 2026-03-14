@@ -25,8 +25,12 @@
 </script>
 
 <div class="mb-6">
-  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
-    <h1 class="font-display text-2xl font-extrabold tracking-tight text-(--color-text)">
+  <div
+    class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4"
+  >
+    <h1
+      class="font-display text-2xl font-extrabold tracking-tight text-(--color-text)"
+    >
       SYSTEM ADMIN //
     </h1>
     <div>
@@ -38,9 +42,7 @@
     </div>
   </div>
 
-  <div
-    class="flex overflow-x-auto border-b border-(--color-border)"
-  >
+  <div class="flex overflow-x-auto border-b border-(--color-border)">
     {#each links as link}
       <a
         href={link.href}

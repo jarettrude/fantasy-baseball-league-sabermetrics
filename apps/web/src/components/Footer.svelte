@@ -35,7 +35,9 @@
 <footer class="mt-auto border-t border-(--color-border) stitch-border-top">
   <!-- Top bar: branding + toggle -->
   <div class="bg-(--color-surface) py-4">
-    <div class="mx-auto max-w-7xl px-page flex flex-col sm:flex-row items-center justify-between gap-3">
+    <div
+      class="mx-auto max-w-7xl px-page flex flex-col sm:flex-row items-center justify-between gap-3"
+    >
       <div class="flex flex-col items-center sm:items-start gap-0.5">
         <span
           class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-text-muted)"

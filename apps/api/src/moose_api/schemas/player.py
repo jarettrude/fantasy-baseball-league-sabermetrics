@@ -64,8 +64,8 @@ class PlayerValueResponse(BaseModel):
     injury_status: str | None
     xwoba: Decimal | None = None
     xera: Decimal | None = None
-    roster_percent: Decimal | None = None
-    roster_trend: Decimal | None = None
+    roster_percent: float | None = None
+    roster_trend: float | None = None
 
 
 class RosterSlotResponse(BaseModel):

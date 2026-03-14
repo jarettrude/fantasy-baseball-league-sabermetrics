@@ -67,26 +67,20 @@
 <div class="space-y-8">
   {#if aiSettings}
     <section class="space-y-4">
-      <div
-        class="flex items-center gap-3"
-      >
+      <div class="flex items-center gap-3">
         <span
           class="font-mono text-[0.55rem] font-bold tracking-widest text-(--color-text-muted)"
           >01</span
         >
-        <h2 class="font-display text-xl font-extrabold tracking-tight text-(--color-text)">
+        <h2
+          class="font-display text-xl font-extrabold tracking-tight text-(--color-text)"
+        >
           Scouting Configuration
         </h2>
       </div>
 
-      <div
-        class="card p-5 space-y-4"
-      >
-        <div
-          class="badge badge-success"
-        >
-          NODE STATUS: ONLINE
-        </div>
+      <div class="card p-5 space-y-4">
+        <div class="badge badge-success">NODE STATUS: ONLINE</div>
 
         <div class="flex flex-col sm:flex-row gap-4">
           <div>
@@ -122,38 +116,30 @@
     </section>
 
     <section class="space-y-4">
-      <div
-        class="flex items-center justify-between"
-      >
+      <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
           <span
             class="font-mono text-[0.55rem] font-bold tracking-widest text-(--color-text-muted)"
             >02</span
           >
-          <h2 class="font-display text-xl font-extrabold tracking-tight text-(--color-text)">
+          <h2
+            class="font-display text-xl font-extrabold tracking-tight text-(--color-text)"
+          >
             Report Templates
           </h2>
         </div>
         {#if saveSuccess}
-          <span
-            class="badge badge-success"
-          >
-            SAVED SUCCESSFULLY
-          </span>
+          <span class="badge badge-success"> SAVED SUCCESSFULLY </span>
         {/if}
         {#if saveError}
-          <span
-            class="badge badge-danger"
-          >
+          <span class="badge badge-danger">
             {saveError}
           </span>
         {/if}
       </div>
 
       <div class="space-y-6">
-        <div
-          class="space-y-2"
-        >
+        <div class="space-y-2">
           <label
             for="guardrails"
             class="font-mono text-xs font-bold tracking-widest uppercase text-(--color-text-muted) flex items-center gap-1.5"
@@ -170,9 +156,7 @@
           ></textarea>
         </div>
 
-        <div
-          class="space-y-2"
-        >
+        <div class="space-y-2">
           <label
             for="league-prompt"
             class="font-mono text-xs font-bold tracking-widest uppercase text-(--color-text-muted) flex items-center gap-1.5"
@@ -188,9 +172,7 @@
           ></textarea>
         </div>
 
-        <div
-          class="space-y-2"
-        >
+        <div class="space-y-2">
           <label
             for="manager-prompt"
             class="font-mono text-xs font-bold tracking-widest uppercase text-(--color-text-muted) flex items-center gap-1.5"
@@ -206,9 +188,7 @@
           ></textarea>
         </div>
 
-        <div
-          class="space-y-2"
-        >
+        <div class="space-y-2">
           <label
             for="briefing-prompt"
             class="font-mono text-xs font-bold tracking-widest uppercase text-(--color-text-muted) flex items-center gap-1.5"
@@ -238,9 +218,7 @@
   {:else if loadingSettings}
     <div class="space-y-4">
       {#each [1, 2, 3] as _}
-        <div
-          class="skeleton h-32 w-full rounded-sm"
-        ></div>
+        <div class="skeleton h-32 w-full rounded-sm"></div>
       {/each}
     </div>
   {/if}

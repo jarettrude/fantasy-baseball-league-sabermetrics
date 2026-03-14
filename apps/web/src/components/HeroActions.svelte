@@ -19,28 +19,13 @@
 
 <div class="mt-8 flex flex-wrap gap-3">
   {#if loading}
-    <div
-      class="skeleton h-10 w-40 rounded-sm"
-    ></div>
+    <div class="skeleton h-10 w-40 rounded-sm"></div>
   {:else if user}
-    <a
-      href="/bench"
-      class="btn btn-primary"
-    >
-      TEAM BENCH //
-    </a>
+    <a href="/bench" class="btn btn-primary"> TEAM BENCH // </a>
   {:else}
-    <a
-      href="/login"
-      class="btn btn-primary"
-    >
-      CONNECT TO YAHOO //
-    </a>
+    <a href="/login" class="btn btn-primary"> CONNECT TO YAHOO // </a>
   {/if}
-  <a
-    href="/dashboard#standings"
-    class="btn btn-secondary"
-  >
+  <a href="/dashboard#standings" class="btn btn-secondary">
     VIEW STANDINGS //
   </a>
 </div>

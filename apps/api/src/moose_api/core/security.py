@@ -13,7 +13,7 @@ from typing import Any
 
 import jwt
 from cryptography.fernet import Fernet
-from fastapi import Cookie, Depends, HTTPException, Request, status
+from fastapi import Cookie, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -58,7 +58,7 @@ def decode_access_token(token: str) -> dict[str, Any]:
     try:
         payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
         return payload
-    except jwt.exceptions.PyJWTError as e:
+    except (jwt.InvalidTokenError, jwt.DecodeError, jwt.ExpiredSignatureError) as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
@@ -112,7 +112,6 @@ def generate_csrf_token() -> str:
 
 
 async def get_current_user(
-    request: Request,
     session_token: str | None = Cookie(None, alias="session_token"),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
@@ -130,6 +129,7 @@ async def get_current_user(
             detail="Invalid token payload",
         )
 
+    from moose_api.models.league import League
     from moose_api.models.team import Team
     from moose_api.models.user import User
 
@@ -141,8 +141,36 @@ async def get_current_user(
             detail="User not found",
         )
 
-    team_result = await db.execute(select(Team).where(Team.manager_user_id == user.id))
-    team = team_result.scalar_one_or_none()
+    league_result = await db.execute(select(League).limit(1))
+    league = league_result.scalar_one_or_none()
+
+    team = None
+    if user.role == "commissioner":
+        if user.yahoo_guid != settings.commissioner_yahoo_guid:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Commissioner access required",
+            )
+    else:
+        if not league:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="League not initialized",
+            )
+
+        team_result = await db.execute(
+            select(Team).where(
+                Team.manager_user_id == user.id,
+                Team.yahoo_manager_guid == user.yahoo_guid,
+                Team.league_id == league.id,
+            )
+        )
+        team = team_result.scalar_one_or_none()
+        if team is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: You are not an active manager in this league.",
+            )
 
     display_name = team.name if team else user.display_name
 

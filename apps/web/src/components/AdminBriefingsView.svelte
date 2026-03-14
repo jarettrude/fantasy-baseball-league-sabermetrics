@@ -161,27 +161,19 @@
     {#if loading}
       <div class="space-y-4">
         {#each [1, 2, 3] as _}
-          <div
-            class="skeleton h-28 w-full rounded-sm"
-          ></div>
+          <div class="skeleton h-28 w-full rounded-sm"></div>
         {/each}
       </div>
     {:else if briefings.length === 0}
-      <div
-        class="card p-8 text-center"
-      >
-        <p
-          class="font-mono text-sm text-(--color-text-muted)"
-        >
+      <div class="card p-8 text-center">
+        <p class="font-mono text-sm text-(--color-text-muted)">
           // NO BRIEFINGS DETECTED //
         </p>
       </div>
     {:else}
       <div class="space-y-4">
         {#each briefings as b (b.id)}
-          <div
-            class="card overflow-hidden"
-          >
+          <div class="card overflow-hidden">
             <div
               class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 p-4 border-b border-(--color-border-subtle)"
             >
@@ -225,9 +217,7 @@
               </div>
             </div>
 
-            <div
-              class="p-4"
-            >
+            <div class="p-4">
               {#if editingBriefing?.id === b.id}
                 <div class="space-y-3">
                   <textarea
@@ -253,20 +243,14 @@
                   </div>
                 </div>
               {:else if b.content}
-                <div
-                  class="relative"
-                >
-                  <div
-                    class="hidden"
-                  ></div>
+                <div class="relative">
+                  <div class="hidden"></div>
                   <div class="prose prose-sm min-w-0">
                     {@html b.content}
                   </div>
                 </div>
               {:else}
-                <p
-                  class="font-mono text-xs text-(--color-danger)"
-                >
+                <p class="font-mono text-xs text-(--color-danger)">
                   [!] NO CONTENT — FATAL GENERATION ERROR
                 </p>
               {/if}
@@ -300,8 +284,7 @@
               : 'bg-(--color-surface-base) text-(--color-text-muted) border-(--color-border-subtle) hover:border-(--color-border) hover:text-(--color-text-muted)'}"
           title="Week {w}"
         >
-          <span class="text-xs font-bold"
-            >#{w.toString().padStart(2, "0")}</span
+          <span class="text-xs font-bold">#{w.toString().padStart(2, "0")}</span
           >
           {#if hasHistory && selectedWeek !== w}
             <div
@@ -312,9 +295,7 @@
       {/each}
     </div>
 
-    <div
-      class="mt-3"
-    >
+    <div class="mt-3">
       <p
         class="font-mono text-[0.55rem] text-(--color-text-muted) leading-relaxed"
       >
