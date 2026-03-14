@@ -46,22 +46,25 @@ import Footer from "../components/Footer.svelte";
             Data Sources We Trust
           </h2>
           <div class="space-y-6">
-            <div
-              class="card p-5 space-y-3"
-            >
+            <div class="card p-5 space-y-3">
               <p
                 class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-commissioner)"
               >
                 Yahoo Fantasy Stats & Injuries
               </p>
-              <h3 class="font-display text-lg font-extrabold text-(--color-text)">
+              <h3
+                class="font-display text-lg font-extrabold text-(--color-text)"
+              >
                 In-Season StatLine Engine
               </h3>
               <p class="text-sm text-(--color-text-muted) leading-relaxed">
                 Daily box scores, roster positions, and official injury tags
                 come straight from Yahoo. We aggregate counting stats (R, HR,
                 RBI, SB, W, SV, K, etc.) plus ratio components (AVG, ERA, WHIP)
-                inside the <code class="font-mono text-xs bg-(--color-surface-inset) px-1.5 py-0.5 rounded-sm">stat_line</code> table.
+                inside the <code
+                  class="font-mono text-xs bg-(--color-surface-inset) px-1.5 py-0.5 rounded-sm"
+                  >stat_line</code
+                > table.
               </p>
               <ul
                 class="space-y-1 text-sm text-(--color-text-muted) leading-relaxed list-disc pl-5"
@@ -81,22 +84,24 @@ import Footer from "../components/Footer.svelte";
               </p>
             </div>
 
-            <div
-              class="card p-5 space-y-3"
-            >
+            <div class="card p-5 space-y-3">
               <p
                 class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-commissioner)"
               >
                 FanGraphs Projections
               </p>
-              <h3 class="font-display text-lg font-extrabold text-(--color-text)">
+              <h3
+                class="font-display text-lg font-extrabold text-(--color-text)"
+              >
                 Projection Baselines
               </h3>
               <p class="text-sm text-(--color-text-muted) leading-relaxed">
                 Before stat samples stabilize (or for prospects with limited
                 run), we backfill with FanGraphs projected lines. Every player
-                keeps a <code class="font-mono text-xs bg-(--color-surface-inset) px-1.5 py-0.5 rounded-sm">projection_baseline</code> record so nobody gets stranded
-                at zero.
+                keeps a <code
+                  class="font-mono text-xs bg-(--color-surface-inset) px-1.5 py-0.5 rounded-sm"
+                  >projection_baseline</code
+                > record so nobody gets stranded at zero.
               </p>
               <ul
                 class="space-y-1 text-sm text-(--color-text-muted) leading-relaxed list-disc pl-5"
@@ -115,15 +120,15 @@ import Footer from "../components/Footer.svelte";
               </p>
             </div>
 
-            <div
-              class="card p-5 space-y-3"
-            >
+            <div class="card p-5 space-y-3">
               <p
                 class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-commissioner)"
               >
                 MLB + Statcast
               </p>
-              <h3 class="font-display text-lg font-extrabold text-(--color-text)">
+              <h3
+                class="font-display text-lg font-extrabold text-(--color-text)"
+              >
                 Probable Starters &amp; Expected Skill
               </h3>
               <p class="text-sm text-(--color-text-muted) leading-relaxed">
@@ -150,15 +155,15 @@ import Footer from "../components/Footer.svelte";
               </p>
             </div>
 
-            <div
-              class="card p-5 space-y-3"
-            >
+            <div class="card p-5 space-y-3">
               <p
                 class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-commissioner)"
               >
                 Vegas &amp; Odds APIs
               </p>
-              <h3 class="font-display text-lg font-extrabold text-(--color-text)">
+              <h3
+                class="font-display text-lg font-extrabold text-(--color-text)"
+              >
                 Matchup Intelligence
               </h3>
               <p class="text-sm text-(--color-text-muted) leading-relaxed">
@@ -180,22 +185,24 @@ import Footer from "../components/Footer.svelte";
               </p>
             </div>
 
-            <div
-              class="card p-5 space-y-3"
-            >
+            <div class="card p-5 space-y-3">
               <p
                 class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-commissioner)"
               >
                 Yahoo Percent-Owned
               </p>
-              <h3 class="font-display text-lg font-extrabold text-(--color-text)">
+              <h3
+                class="font-display text-lg font-extrabold text-(--color-text)"
+              >
                 Roster % &amp; Trend Pulse
               </h3>
               <p class="text-sm text-(--color-text-muted) leading-relaxed">
-                A nightly cron hits Yahoo&#39;s <code class="font-mono text-xs bg-(--color-surface-inset) px-1.5 py-0.5 rounded-sm">percent_owned</code> endpoint
-                in batches of 25 players. We stamp the day&#39;s roster percentage
-                onto each snapshot and compare it to the mark three days ago to derive
-                the trend value shown on the Bench table.
+                A nightly cron hits Yahoo&#39;s <code
+                  class="font-mono text-xs bg-(--color-surface-inset) px-1.5 py-0.5 rounded-sm"
+                  >percent_owned</code
+                > endpoint in batches of 25 players. We stamp the day&#39;s roster
+                percentage onto each snapshot and compare it to the mark three days
+                ago to derive the trend value shown on the Bench table.
               </p>
               <ul
                 class="space-y-1 text-sm text-(--color-text-muted) leading-relaxed list-disc pl-5"
@@ -222,32 +229,42 @@ import Footer from "../components/Footer.svelte";
             How We Calculate Value
           </h2>
           <div class="space-y-6">
-            <div
-              class="card p-5 space-y-3"
-            >
-              <p class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-commissioner)">
+            <div class="card p-5 space-y-3">
+              <p
+                class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-commissioner)"
+              >
                 Pipeline Overview
               </p>
-              <ol class="space-y-3 text-sm text-(--color-text-muted) leading-relaxed list-decimal pl-5">
+              <ol
+                class="space-y-3 text-sm text-(--color-text-muted) leading-relaxed list-decimal pl-5"
+              >
                 <li>
-                  <strong class="text-(--color-text)">Assemble player profiles.</strong> We merge Yahoo stat totals
-                  with FanGraphs projections (for missing data) and include injury
-                  status, Yahoo rank, Statcast xStats, and schedule/matchup tags.
+                  <strong class="text-(--color-text)"
+                    >Assemble player profiles.</strong
+                  > We merge Yahoo stat totals with FanGraphs projections (for missing
+                  data) and include injury status, Yahoo rank, Statcast xStats, and
+                  schedule/matchup tags.
                 </li>
                 <li>
-                  <strong class="text-(--color-text)">Convert each stat to a z-score.</strong> For every Yahoo
-                  category a league tracks, we compute
-                  <code class="font-mono text-xs bg-(--color-surface-inset) px-1.5 py-0.5 rounded-sm">z = (player - mean) / stdev</code>. Negative stats (ERA,
-                  WHIP) get inverted so lower is better.
+                  <strong class="text-(--color-text)"
+                    >Convert each stat to a z-score.</strong
+                  > For every Yahoo category a league tracks, we compute
+                  <code
+                    class="font-mono text-xs bg-(--color-surface-inset) px-1.5 py-0.5 rounded-sm"
+                    >z = (player - mean) / stdev</code
+                  >. Negative stats (ERA, WHIP) get inverted so lower is better.
                 </li>
                 <li>
-                  <strong class="text-(--color-text)">Blend into a composite.</strong> We take the mean of all
-                  category z-scores to form a base composite. If a player has zero
-                  data sources, we lean on their Yahoo rank to avoid lumping prospects
-                  at 0.00.
+                  <strong class="text-(--color-text)"
+                    >Blend into a composite.</strong
+                  > We take the mean of all category z-scores to form a base composite.
+                  If a player has zero data sources, we lean on their Yahoo rank to
+                  avoid lumping prospects at 0.00.
                 </li>
                 <li>
-                  <strong class="text-(--color-text)">Adjust for context.</strong>
+                  <strong class="text-(--color-text)"
+                    >Adjust for context.</strong
+                  >
                   <ul class="mt-1 space-y-1 list-disc pl-5">
                     <li>
                       <em>Season Value:</em> composite × injury_weight (based on status).
@@ -259,24 +276,27 @@ import Footer from "../components/Footer.svelte";
                   </ul>
                 </li>
                 <li>
-                  <strong class="text-(--color-text)">Rank + store snapshots.</strong> We sort composite values
-                  to assign our internal rank, pair it with the latest Yahoo rank,
-                  then persist everything in <code class="font-mono text-xs bg-(--color-surface-inset) px-1.5 py-0.5 rounded-sm">player_value_snapshot</code> for
-                  the Bench API to read.
+                  <strong class="text-(--color-text)"
+                    >Rank + store snapshots.</strong
+                  > We sort composite values to assign our internal rank, pair it
+                  with the latest Yahoo rank, then persist everything in <code
+                    class="font-mono text-xs bg-(--color-surface-inset) px-1.5 py-0.5 rounded-sm"
+                    >player_value_snapshot</code
+                  > for the Bench API to read.
                 </li>
               </ol>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div
-                class="card p-5 space-y-3"
-              >
+              <div class="card p-5 space-y-3">
                 <p
                   class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-commissioner)"
                 >
                   Season Value
                 </p>
-                <h3 class="font-display text-lg font-extrabold text-(--color-text)">
+                <h3
+                  class="font-display text-lg font-extrabold text-(--color-text)"
+                >
                   Long View, Real Stats
                 </h3>
                 <ul
@@ -303,7 +323,9 @@ import Footer from "../components/Footer.svelte";
                 >
                   Next 7 Value
                 </p>
-                <h3 class="font-display text-lg font-extrabold text-(--color-text)">
+                <h3
+                  class="font-display text-lg font-extrabold text-(--color-text)"
+                >
                   Short Burst Forecast
                 </h3>
                 <ul
@@ -332,22 +354,27 @@ import Footer from "../components/Footer.svelte";
           >
             Quick Hits &amp; Notes
           </h2>
-          <div class="card p-5 space-y-4 text-sm text-(--color-text-muted) leading-relaxed">
+          <div
+            class="card p-5 space-y-4 text-sm text-(--color-text-muted) leading-relaxed"
+          >
             <p>
-              <strong class="text-(--color-text)">Why can a low Yahoo rank still grade well?</strong> If a player
-              is just back from the IL, our composite values spike as soon as their
-              per-category z-scores climb, even before Yahoo updates their public
-              rank.
+              <strong class="text-(--color-text)"
+                >Why can a low Yahoo rank still grade well?</strong
+              > If a player is just back from the IL, our composite values spike as
+              soon as their per-category z-scores climb, even before Yahoo updates
+              their public rank.
             </p>
             <p>
-              <strong class="text-(--color-text)">What if a player has no data anywhere?</strong> They land at
-              a neutral 0.0 composite but still inherit our injury weighting and show
-              up on the roster list so you know the slot is occupied.
+              <strong class="text-(--color-text)"
+                >What if a player has no data anywhere?</strong
+              > They land at a neutral 0.0 composite but still inherit our injury
+              weighting and show up on the roster list so you know the slot is occupied.
             </p>
             <p>
-              <strong class="text-(--color-text)">Why do some numbers turn yellow?</strong> BenchView highlights
-              stale data when the snapshot timestamps are more than 24 hours old,
-              reminding you to kick off a recompute if needed.
+              <strong class="text-(--color-text)"
+                >Why do some numbers turn yellow?</strong
+              > BenchView highlights stale data when the snapshot timestamps are more
+              than 24 hours old, reminding you to kick off a recompute if needed.
             </p>
           </div>
         </section>
@@ -359,9 +386,7 @@ import Footer from "../components/Footer.svelte";
             Glossary for Data Nerds
           </h2>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div
-              class="card p-5 space-y-2"
-            >
+            <div class="card p-5 space-y-2">
               <p
                 class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-commissioner)"
               >
@@ -372,9 +397,7 @@ import Footer from "../components/Footer.svelte";
                 fixes. Positive = above-league-average contributor.
               </p>
             </div>
-            <div
-              class="card p-5 space-y-2"
-            >
+            <div class="card p-5 space-y-2">
               <p
                 class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-commissioner)"
               >
@@ -385,9 +408,7 @@ import Footer from "../components/Footer.svelte";
                 Multiplies straight into the composite for realism.
               </p>
             </div>
-            <div
-              class="card p-5 space-y-2"
-            >
+            <div class="card p-5 space-y-2">
               <p
                 class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-commissioner)"
               >

@@ -174,27 +174,17 @@
       <div class="space-y-4">
         {#each [1, 2] as _}
           <div class="card p-6">
-            <div
-              class="skeleton h-5 w-40 mb-3"
-            ></div>
-            <div
-              class="skeleton h-20 w-full"
-            ></div>
+            <div class="skeleton h-5 w-40 mb-3"></div>
+            <div class="skeleton h-20 w-full"></div>
           </div>
         {/each}
       </div>
     {:else if recaps.length === 0}
-      <div
-        class="card p-8 text-center"
-      >
-        <p
-          class="font-mono text-sm text-(--color-text-muted)"
-        >
+      <div class="card p-8 text-center">
+        <p class="font-mono text-sm text-(--color-text-muted)">
           // NO REPORTS DATA FOR WEEK {selectedWeek} //
         </p>
-        <p
-          class="font-mono text-[0.6rem] text-(--color-text-muted) mt-2"
-        >
+        <p class="font-mono text-[0.6rem] text-(--color-text-muted) mt-2">
           Sync league data or check worker logs to verify generation pipeline.
         </p>
       </div>
@@ -211,9 +201,7 @@
           </h3>
           <div class="space-y-4">
             {#each leagueRecaps as recap (recap.id)}
-              <div
-                class="card overflow-hidden"
-              >
+              <div class="card overflow-hidden">
                 <div
                   class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 p-4 border-b border-(--color-border-subtle)"
                 >
@@ -226,9 +214,7 @@
                           ? "LEAGUE REPORT"
                           : `MANAGER: ${recap.team_name ?? "UNKNOWN"}`}
                       </span>
-                      <span
-                        class="badge {statusBadgeClass(recap.status)}"
-                      >
+                      <span class="badge {statusBadgeClass(recap.status)}">
                         {recap.status}
                       </span>
                     </div>
@@ -265,16 +251,10 @@
                   </div>
                 </div>
 
-                <div
-                  class="p-4"
-                >
+                <div class="p-4">
                   {#if recap.content}
-                    <div
-                      class="relative"
-                    >
-                      <div
-                        class="hidden"
-                      ></div>
+                    <div class="relative">
+                      <div class="hidden"></div>
                       <p
                         class="font-mono text-xs text-(--color-text-muted) whitespace-pre-wrap line-clamp-6"
                       >
@@ -282,9 +262,7 @@
                       </p>
                     </div>
                   {:else}
-                    <p
-                      class="font-mono text-xs text-(--color-danger)"
-                    >
+                    <p class="font-mono text-xs text-(--color-danger)">
                       [!] NO CONTENT — FATAL GENERATION ERROR
                     </p>
                   {/if}
@@ -304,9 +282,7 @@
           </h3>
           <div class="space-y-4">
             {#each managerRecaps as recap (recap.id)}
-              <div
-                class="card overflow-hidden"
-              >
+              <div class="card overflow-hidden">
                 <div
                   class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 p-4 border-b border-(--color-border-subtle)"
                 >
@@ -317,9 +293,7 @@
                       >
                         MANAGER: {recap.team_name ?? "UNKNOWN"}
                       </span>
-                      <span
-                        class="badge {statusBadgeClass(recap.status)}"
-                      >
+                      <span class="badge {statusBadgeClass(recap.status)}">
                         {recap.status}
                       </span>
                     </div>
@@ -356,16 +330,10 @@
                   </div>
                 </div>
 
-                <div
-                  class="p-4"
-                >
+                <div class="p-4">
                   {#if recap.content}
-                    <div
-                      class="relative"
-                    >
-                      <div
-                        class="hidden"
-                      ></div>
+                    <div class="relative">
+                      <div class="hidden"></div>
                       <p
                         class="font-mono text-xs text-(--color-text-muted) whitespace-pre-wrap line-clamp-6"
                       >
@@ -373,9 +341,7 @@
                       </p>
                     </div>
                   {:else}
-                    <p
-                      class="font-mono text-xs text-(--color-danger)"
-                    >
+                    <p class="font-mono text-xs text-(--color-danger)">
                       [!] NO CONTENT — FATAL GENERATION ERROR
                     </p>
                   {/if}
@@ -412,8 +378,7 @@
               : 'bg-(--color-surface-base) text-(--color-text-muted) border-(--color-border-subtle) hover:border-(--color-border) hover:text-(--color-text-muted)'}"
           title="Week {w}"
         >
-          <span class="text-xs font-bold"
-            >#{w.toString().padStart(2, "0")}</span
+          <span class="text-xs font-bold">#{w.toString().padStart(2, "0")}</span
           >
           {#if hasHistory && selectedWeek !== w}
             <div
@@ -424,13 +389,10 @@
       {/each}
     </div>
 
-    <div
-      class="mt-3"
-    >
+    <div class="mt-3">
       <div class="flex items-center gap-1.5 mb-1">
         <div class="h-1.5 w-1.5 rounded-full bg-(--color-success)"></div>
-        <span
-          class="font-mono text-[0.55rem] text-(--color-text-muted)"
+        <span class="font-mono text-[0.55rem] text-(--color-text-muted)"
           >Published Issue</span
         >
       </div>
@@ -467,17 +429,12 @@
             ? "LEAGUE"
             : editingRecap.team_name} //
         </h2>
-        <button
-          onclick={cancelEdit}
-          class="btn btn-secondary text-xs"
-        >
+        <button onclick={cancelEdit} class="btn btn-secondary text-xs">
           [X] CLOSE
         </button>
       </div>
       <div class="p-4 flex-1 overflow-y-auto space-y-4">
-        <div
-          class="font-mono text-[0.6rem] text-(--color-text-muted)"
-        >
+        <div class="font-mono text-[0.6rem] text-(--color-text-muted)">
           MD FORMAT REQUIRED. SYSTEM ACCEPTS STANDARD MARKDOWN TOKENS.
         </div>
         <textarea
@@ -488,17 +445,10 @@
           spellcheck="false"
         ></textarea>
         <div class="flex justify-end gap-2">
-          <button
-            onclick={cancelEdit}
-            class="btn btn-secondary"
-          >
+          <button onclick={cancelEdit} class="btn btn-secondary">
             ABORT
           </button>
-          <button
-            onclick={saveEdit}
-            disabled={saving}
-            class="btn btn-primary"
-          >
+          <button onclick={saveEdit} disabled={saving} class="btn btn-primary">
             {saving ? "COMMITTING..." : "COMMIT OVERRIDE"}
           </button>
         </div>

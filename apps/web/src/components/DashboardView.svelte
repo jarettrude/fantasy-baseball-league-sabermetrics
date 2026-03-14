@@ -229,9 +229,7 @@
 <div>
   <!-- ── WELCOME SECTION ──────────────────────────────────────── -->
   <section id="welcome" class="mb-8">
-    <div
-      class="animate-fade-in"
-    >
+    <div class="animate-fade-in">
       <div
         class="font-mono text-xs font-bold tracking-widest uppercase text-(--color-commissioner) mb-2"
       >
@@ -241,14 +239,14 @@
         class="font-display text-3xl md:text-4xl font-extrabold tracking-tight text-(--color-text) leading-tight"
       >
         {#if user}
-          Welcome,<br /><span class="text-(--color-accent-ember)">{user.display_name}</span>
+          Welcome,<br /><span class="text-(--color-accent-ember)"
+            >{user.display_name}</span
+          >
         {:else}
           Command<br />Center
         {/if}
       </h1>
-      <p
-        class="mt-2 font-mono text-xs text-(--color-text-muted) tracking-wide"
-      >
+      <p class="mt-2 font-mono text-xs text-(--color-text-muted) tracking-wide">
         // SABERMETRICS &amp; TEAM OPERATIONS
       </p>
     </div>
@@ -265,16 +263,16 @@
     </div>
   {:else if error}
     <div class="card p-6 border-l-4 border-l-(--color-danger)">
-      <p class="font-mono text-sm font-bold text-(--color-danger) mb-2">{error}</p>
+      <p class="font-mono text-sm font-bold text-(--color-danger) mb-2">
+        {error}
+      </p>
       <p class="text-sm text-(--color-text-muted)">
         Make sure the league has been synced. Check the admin panel.
       </p>
     </div>
   {:else}
     <!-- Stats overview row -->
-    <div
-      class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 stagger-in"
-    >
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 stagger-in">
       <!-- Active League tile — left accent -->
       <div
         class="card p-5 border-l-4 border-l-(--color-commissioner) relative overflow-hidden"
@@ -295,9 +293,7 @@
             {standings?.league_name || "N/A"}
           </p>
         </div>
-        <p
-          class="mt-3 font-mono text-xs text-(--color-text-muted)"
-        >
+        <p class="mt-3 font-mono text-xs text-(--color-text-muted)">
           S{standings?.season} &middot; WK {standings?.current_week}
         </p>
       </div>
@@ -312,9 +308,7 @@
           >
             Organizations
           </h3>
-          <p
-            class="font-display text-3xl font-extrabold text-(--color-text)"
-          >
+          <p class="font-display text-3xl font-extrabold text-(--color-text)">
             {standings?.standings?.length || 0}
           </p>
         </div>
@@ -323,8 +317,7 @@
           class="mt-3 flex items-center justify-between font-mono text-xs font-bold tracking-wide text-(--color-commissioner) hover:text-(--color-accent-ember) group"
         >
           <span>Standings Engine</span>
-          <span
-            class="group-hover:translate-y-0.5 transition-transform"
+          <span class="group-hover:translate-y-0.5 transition-transform"
             >&darr;</span
           >
         </a>
@@ -343,7 +336,8 @@
             class="flex items-center justify-between py-1.5 px-2 rounded-sm font-mono text-xs text-(--color-text-secondary) hover:text-(--color-text) hover:bg-(--color-surface-raised) group"
           >
             <span>My Matchup</span>
-            <span class="text-(--color-text-muted) group-hover:translate-x-0.5 transition-transform"
+            <span
+              class="text-(--color-text-muted) group-hover:translate-x-0.5 transition-transform"
               >&rarr;</span
             >
           </a>
@@ -352,7 +346,8 @@
             class="flex items-center justify-between py-1.5 px-2 rounded-sm font-mono text-xs text-(--color-text-secondary) hover:text-(--color-text) hover:bg-(--color-surface-raised) group"
           >
             <span>League Matchups</span>
-            <span class="text-(--color-text-muted) group-hover:translate-x-0.5 transition-transform"
+            <span
+              class="text-(--color-text-muted) group-hover:translate-x-0.5 transition-transform"
               >&rarr;</span
             >
           </a>
@@ -361,7 +356,8 @@
             class="flex items-center justify-between py-1.5 px-2 rounded-sm font-mono text-xs text-(--color-text-secondary) hover:text-(--color-text) hover:bg-(--color-surface-raised) group"
           >
             <span>Manage Bench</span>
-            <span class="text-(--color-text-muted) group-hover:translate-x-0.5 transition-transform"
+            <span
+              class="text-(--color-text-muted) group-hover:translate-x-0.5 transition-transform"
               >&rarr;</span
             >
           </a>
@@ -370,7 +366,8 @@
             class="flex items-center justify-between py-1.5 px-2 rounded-sm font-mono text-xs text-(--color-text-secondary) hover:text-(--color-text) hover:bg-(--color-surface-raised) group"
           >
             <span>Commish Notes</span>
-            <span class="text-(--color-text-muted) group-hover:translate-x-0.5 transition-transform"
+            <span
+              class="text-(--color-text-muted) group-hover:translate-x-0.5 transition-transform"
               >&rarr;</span
             >
           </a>
@@ -381,9 +378,7 @@
     {#if matchups?.matchups?.length}
       {#if myMatchup}
         <section id="matchup" class="mb-10">
-          <div
-            class="flex items-center justify-between mb-4"
-          >
+          <div class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-3">
               <div class="w-1 h-6 bg-(--color-commissioner) rounded-full"></div>
               <h2
@@ -393,11 +388,8 @@
               </h2>
             </div>
             {#if isGameHours()}
-              <span
-                class="badge badge-success"
-              >
-                <span class="status-dot status-dot-success"
-                ></span>
+              <span class="badge badge-success">
+                <span class="status-dot status-dot-success"></span>
                 Live Sync Active
               </span>
             {/if}
@@ -429,9 +421,7 @@
                   >
                     {myMatchup.team_a_name}
                   </p>
-                  <p
-                    class="font-mono text-[0.6rem] text-(--color-text-muted)"
-                  >
+                  <p class="font-mono text-[0.6rem] text-(--color-text-muted)">
                     {getTeamRecord(myMatchup.team_a_name) || "—"} record
                   </p>
                 </div>
@@ -478,9 +468,7 @@
                   >
                     {myMatchup.team_b_name}
                   </p>
-                  <p
-                    class="font-mono text-[0.6rem] text-(--color-text-muted)"
-                  >
+                  <p class="font-mono text-[0.6rem] text-(--color-text-muted)">
                     {getTeamRecord(myMatchup.team_b_name) || "—"} record
                   </p>
                 </div>
@@ -499,25 +487,14 @@
               class="flex items-center justify-center gap-3 py-2 border-t border-(--color-border-subtle) bg-(--color-surface-inset)"
             >
               {#if myMatchup.is_complete}
-                <span
-                  class="badge badge-info"
-                  >FINAL</span
-                >
+                <span class="badge badge-info">FINAL</span>
               {:else if isPreseason}
-                <span
-                  class="badge badge-warning"
-                  >PRESEASON</span
-                >
+                <span class="badge badge-warning">PRESEASON</span>
               {:else}
-                <span
-                  class="badge badge-success"
-                  >LIVE</span
-                >
+                <span class="badge badge-success">LIVE</span>
               {/if}
               {#if myMatchup.ties > 0}
-                <span class="badge"
-                  >{myMatchup.ties} TIES</span
-                >
+                <span class="badge">{myMatchup.ties} TIES</span>
               {/if}
             </div>
 
@@ -531,9 +508,7 @@
                   >
                     Category Breakdown
                   </h3>
-                  <p
-                    class="text-xs text-(--color-text-muted) mt-0.5"
-                  >
+                  <p class="text-xs text-(--color-text-muted) mt-0.5">
                     {#if isPreseason}
                       Matchups unlock once the season week ({startWeek}) begins.
                       No live head-to-head stats yet.
@@ -543,9 +518,7 @@
                   </p>
                 </div>
                 {#if hasMatchupStats}
-                  <span
-                    class="badge"
-                    >Week {matchups?.week || currentWeek}</span
+                  <span class="badge">Week {matchups?.week || currentWeek}</span
                   >
                 {/if}
               </div>
@@ -565,16 +538,18 @@
                 </div>
               {:else if hasMatchupStats}
                 <div class="overflow-x-auto -mx-4 sm:-mx-6">
-                  <table
-                    class="w-full text-sm"
-                  >
+                  <table class="w-full text-sm">
                     <thead>
-                      <tr
-                        class="border-b border-(--color-border)"
-                      >
-                        <th class="px-4 sm:px-6 py-3 text-left font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted)">Team</th>
+                      <tr class="border-b border-(--color-border)">
+                        <th
+                          class="px-4 sm:px-6 py-3 text-left font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted)"
+                          >Team</th
+                        >
                         {#each categoryNames as cat}
-                          <th class="px-3 py-3 text-center font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted)">{cat}</th>
+                          <th
+                            class="px-3 py-3 text-center font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted)"
+                            >{cat}</th
+                          >
                         {/each}
                       </tr>
                     </thead>
@@ -638,9 +613,7 @@
 
       <!-- ── LEAGUE MATCHUPS SECTION ──────────────────────────────── -->
       <section id="league-matchups" class="mb-10">
-        <div
-          class="flex items-center gap-3 mb-4"
-        >
+        <div class="flex items-center gap-3 mb-4">
           <div class="w-1 h-6 bg-(--color-commissioner) rounded-full"></div>
           <h2
             class="font-display text-xl md:text-2xl font-extrabold tracking-tight text-(--color-text)"
@@ -650,9 +623,7 @@
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           {#each matchups.matchups as matchup}
-            <div
-              class="card overflow-hidden"
-            >
+            <div class="card overflow-hidden">
               <div class="flex">
                 <div
                   class="relative flex flex-1 flex-col items-center justify-center p-3 {matchup.team_a_wins >
@@ -738,25 +709,14 @@
                 class="flex items-center justify-center gap-2 py-1.5 border-t border-(--color-border-subtle) bg-(--color-surface-inset)"
               >
                 {#if matchup.is_complete}
-                  <span
-                    class="badge badge-info"
-                    >FINAL</span
-                  >
+                  <span class="badge badge-info">FINAL</span>
                 {:else if isPreseason}
-                  <span
-                    class="badge badge-warning"
-                    >PRESEASON</span
-                  >
+                  <span class="badge badge-warning">PRESEASON</span>
                 {:else}
-                  <span
-                    class="badge badge-success"
-                    >LIVE</span
-                  >
+                  <span class="badge badge-success">LIVE</span>
                 {/if}
                 {#if matchup.ties > 0}
-                  <span class="badge"
-                    >{matchup.ties} TIES</span
-                  >
+                  <span class="badge">{matchup.ties} TIES</span>
                 {/if}
               </div>
             </div>
@@ -784,28 +744,38 @@
             </div>
           </div>
           {#if standings.current_week}
-            <span
-              class="badge"
-            >
+            <span class="badge">
               WK {standings.current_week}
             </span>
           {/if}
         </div>
 
-        <div
-          class="card overflow-hidden"
-        >
+        <div class="card overflow-hidden">
           <table class="w-full text-sm">
             <thead>
-              <tr
-                class="border-b border-(--color-border)"
-              >
-                <th class="px-4 py-3 text-center font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted) w-16">Rank</th>
-                <th class="px-4 py-3 text-left font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted)">Organization</th>
-                <th class="px-3 py-3 text-center font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted)">W</th>
-                <th class="px-3 py-3 text-center font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted)">L</th>
-                <th class="px-3 py-3 text-center font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted) hidden sm:table-cell">T</th>
-                <th class="px-3 py-3 text-center font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted) hidden sm:table-cell"
+              <tr class="border-b border-(--color-border)">
+                <th
+                  class="px-4 py-3 text-center font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted) w-16"
+                  >Rank</th
+                >
+                <th
+                  class="px-4 py-3 text-left font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted)"
+                  >Organization</th
+                >
+                <th
+                  class="px-3 py-3 text-center font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted)"
+                  >W</th
+                >
+                <th
+                  class="px-3 py-3 text-center font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted)"
+                  >L</th
+                >
+                <th
+                  class="px-3 py-3 text-center font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted) hidden sm:table-cell"
+                  >T</th
+                >
+                <th
+                  class="px-3 py-3 text-center font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted) hidden sm:table-cell"
                   >Win %</th
                 >
               </tr>

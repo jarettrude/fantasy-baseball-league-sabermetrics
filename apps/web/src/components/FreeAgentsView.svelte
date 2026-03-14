@@ -81,6 +81,17 @@
     }
   }
 
+  function toNumber(value: unknown): number | null {
+    if (value === null || value === undefined || value === "") return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  function formatTrend(value: unknown): string | null {
+    const numeric = toNumber(value);
+    return numeric === null ? null : numeric.toFixed(1);
+  }
+
   let sortedFA = $derived(
     data?.free_agents
       ? [...data.free_agents].sort((a, b) => {
@@ -197,7 +208,9 @@
   <div class="space-y-3">
     <div class="card overflow-hidden">
       {#each [1, 2, 3, 4, 5] as _}
-        <div class="flex items-center gap-4 px-4 py-3 border-b border-(--color-border-subtle)">
+        <div
+          class="flex items-center gap-4 px-4 py-3 border-b border-(--color-border-subtle)"
+        >
           <div class="skeleton h-4 w-28"></div>
           <div class="skeleton h-4 w-16"></div>
         </div>
@@ -205,18 +218,16 @@
     </div>
   </div>
 {:else if error}
-  <div class="card p-6 border-l-4 border-l-(--color-danger) font-mono text-sm text-(--color-danger)">{error}</div>
+  <div
+    class="card p-6 border-l-4 border-l-(--color-danger) font-mono text-sm text-(--color-danger)"
+  >
+    {error}
+  </div>
 {:else if data}
   <div class="mb-6">
-    <div
-      class="flex flex-col gap-1 text-right"
-    >
-      <div
-        class="hidden"
-      ></div>
-      <div
-        class="hidden"
-      ></div>
+    <div class="flex flex-col gap-1 text-right">
+      <div class="hidden"></div>
+      <div class="hidden"></div>
       <div class="font-mono text-[0.6rem] text-(--color-text-muted)">
         {#if freshnessWarning(data.snapshot_at)}
           <span
@@ -236,23 +247,21 @@
   </div>
 
   {#if data.free_agents.length === 0}
-    <div class="card p-6 text-center font-mono text-sm text-(--color-text-muted)">
+    <div
+      class="card p-6 text-center font-mono text-sm text-(--color-text-muted)"
+    >
       No free agents found. Try a different filter or wait for sync.
     </div>
   {:else}
     {#if addCandidates.length > 0}
-      <div
-        class="card p-5 mb-6 border-l-4 border-l-(--color-success)"
-      >
+      <div class="card p-5 mb-6 border-l-4 border-l-(--color-success)">
         <div class="mb-3">
           <span
             class="font-mono text-xs font-bold tracking-widest uppercase text-(--color-success)"
           >
             SYSTEM ALERT
           </span>
-          <p
-            class="font-mono text-[0.6rem] text-(--color-text-muted) mt-0.5"
-          >
+          <p class="font-mono text-[0.6rem] text-(--color-text-muted) mt-0.5">
             // TOP ADD RECOMMENDATIONS
           </p>
         </div>
@@ -261,14 +270,10 @@
             <div
               class="flex items-center gap-2 rounded-sm bg-(--color-success-muted) border border-(--color-success)/30 px-3 py-2"
             >
-              <div
-                class="font-display text-sm font-bold text-(--color-text)"
-              >
+              <div class="font-display text-sm font-bold text-(--color-text)">
                 {fa.player.name}
               </div>
-              <div
-                class="font-mono text-xs font-bold text-(--color-success)"
-              >
+              <div class="font-mono text-xs font-bold text-(--color-success)">
                 {Number(fa.season_value?.composite_value ?? 0).toFixed(2)}
               </div>
             </div>
@@ -371,10 +376,9 @@
         </thead>
         <tbody class="divide-y divide-(--color-border-subtle)">
           {#each paginatedFA as fa}
-            <tr
-              class="hover:bg-(--color-surface-raised)"
-            >
-              <td class="px-3 py-2.5 font-display text-sm font-bold text-(--color-text) whitespace-nowrap"
+            <tr class="hover:bg-(--color-surface-raised)">
+              <td
+                class="px-3 py-2.5 font-display text-sm font-bold text-(--color-text) whitespace-nowrap"
                 >{fa.player.name}</td
               >
               <td
@@ -385,10 +389,12 @@
                 class="px-2 py-2.5 text-center font-mono text-xs text-(--color-text-muted) hidden lg:table-cell"
                 >{fa.season_value?.our_rank || "-"}</td
               >
-              <td class="px-2 py-2.5 text-center font-mono text-xs text-(--color-text-muted)"
+              <td
+                class="px-2 py-2.5 text-center font-mono text-xs text-(--color-text-muted)"
                 >{fa.player.primary_position}</td
               >
-              <td class="px-2 py-2.5 text-center font-mono text-xs text-(--color-text-muted) hidden md:table-cell"
+              <td
+                class="px-2 py-2.5 text-center font-mono text-xs text-(--color-text-muted) hidden md:table-cell"
                 >{fa.player.team_abbr || "-"}</td
               >
               <td
@@ -415,40 +421,55 @@
                 {/if}
               </td>
               <td
-                class="px-2 py-2.5 text-center font-mono text-xs font-bold {Number(fa.season_value?.composite_value ?? 0) > 0 ? 'text-(--color-success)' : Number(fa.season_value?.composite_value ?? 0) < 0 ? 'text-(--color-danger)' : 'text-(--color-text-muted)'}"
+                class="px-2 py-2.5 text-center font-mono text-xs font-bold {Number(
+                  fa.season_value?.composite_value ?? 0,
+                ) > 0
+                  ? 'text-(--color-success)'
+                  : Number(fa.season_value?.composite_value ?? 0) < 0
+                    ? 'text-(--color-danger)'
+                    : 'text-(--color-text-muted)'}"
               >
                 {fa.season_value
                   ? Number(fa.season_value.composite_value).toFixed(2)
                   : "-"}
               </td>
-              <td
-                class="px-2 py-2.5 text-center hidden xl:table-cell"
-              >
+              <td class="px-2 py-2.5 text-center hidden xl:table-cell">
                 {#if fa.season_value?.roster_percent !== null && fa.season_value?.roster_percent !== undefined}
                   <div class="flex items-center justify-center gap-1">
                     <span class="font-mono text-xs text-(--color-text-muted)"
                       >{fa.season_value.roster_percent}%</span
                     >
-                    {#if fa.season_value.roster_trend && fa.season_value.roster_trend > 0}
-                      <span class="font-mono text-[0.6rem] text-(--color-success)"
-                        >+{fa.season_value.roster_trend.toFixed(1)}</span
+                    {#if toNumber(fa.season_value.roster_trend) !== null && toNumber(fa.season_value.roster_trend)! > 0}
+                      <span
+                        class="font-mono text-[0.6rem] text-(--color-success)"
+                        >+{formatTrend(fa.season_value.roster_trend)}</span
                       >
-                    {:else if fa.season_value.roster_trend && fa.season_value.roster_trend < 0}
-                      <span class="font-mono text-[0.6rem] text-(--color-danger)"
-                        >{fa.season_value.roster_trend.toFixed(1)}</span
+                    {:else if toNumber(fa.season_value.roster_trend) !== null && toNumber(fa.season_value.roster_trend)! < 0}
+                      <span
+                        class="font-mono text-[0.6rem] text-(--color-danger)"
+                        >{formatTrend(fa.season_value.roster_trend)}</span
                       >
                     {:else}
-                      <span class="font-mono text-[0.6rem] text-(--color-text-muted)"
+                      <span
+                        class="font-mono text-[0.6rem] text-(--color-text-muted)"
                         >—</span
                       >
                     {/if}
                   </div>
                 {:else}
-                  <span class="font-mono text-xs text-(--color-text-muted)">-</span>
+                  <span class="font-mono text-xs text-(--color-text-muted)"
+                    >-</span
+                  >
                 {/if}
               </td>
               <td
-                class="px-2 py-2.5 text-center font-mono text-xs font-bold hidden sm:table-cell {Number(fa.next_games_value?.composite_value ?? 0) > 0 ? 'text-(--color-success)' : Number(fa.next_games_value?.composite_value ?? 0) < 0 ? 'text-(--color-danger)' : 'text-(--color-text-muted)'}"
+                class="px-2 py-2.5 text-center font-mono text-xs font-bold hidden sm:table-cell {Number(
+                  fa.next_games_value?.composite_value ?? 0,
+                ) > 0
+                  ? 'text-(--color-success)'
+                  : Number(fa.next_games_value?.composite_value ?? 0) < 0
+                    ? 'text-(--color-danger)'
+                    : 'text-(--color-text-muted)'}"
               >
                 {fa.next_games_value
                   ? Number(fa.next_games_value.composite_value).toFixed(2)
@@ -460,9 +481,7 @@
                     >{fa.player.injury_status}</span
                   >
                 {:else}
-                  <span class="badge badge-success"
-                    >Available</span
-                  >
+                  <span class="badge badge-success">Available</span>
                 {/if}
               </td>
             </tr>
@@ -471,7 +490,9 @@
       </table>
     </div>
 
-    <div class="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4">
+    <div
+      class="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4"
+    >
       <div class="font-mono text-[0.6rem] text-(--color-text-muted)">
         Showing {(currentPage - 1) * pageSize + 1} to {Math.min(
           currentPage * pageSize,

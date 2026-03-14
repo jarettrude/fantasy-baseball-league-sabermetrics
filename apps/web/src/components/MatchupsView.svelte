@@ -45,19 +45,19 @@
     {/each}
   </div>
 {:else if error}
-  <div class="card p-6 border-l-4 border-l-(--color-danger) font-mono text-sm text-(--color-danger)">{error}</div>
-{:else if data}
   <div
-    class="flex items-center justify-between mb-6"
+    class="card p-6 border-l-4 border-l-(--color-danger) font-mono text-sm text-(--color-danger)"
   >
+    {error}
+  </div>
+{:else if data}
+  <div class="flex items-center justify-between mb-6">
     <span
       class="font-display text-2xl font-extrabold tracking-tight text-(--color-text)"
       >WEEK {data.week}</span
     >
     {#if data.generated_at}
-      <div
-        class="font-mono text-[0.6rem] text-(--color-text-muted)"
-      >
+      <div class="font-mono text-[0.6rem] text-(--color-text-muted)">
         // Matchups Scoreboard: {formatTs(data.generated_at)}
       </div>
     {/if}
@@ -71,9 +71,7 @@
   {:else}
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       {#each data.matchups as matchup}
-        <div
-          class="card overflow-hidden"
-        >
+        <div class="card overflow-hidden">
           <div class="flex">
             <div
               class="relative flex flex-1 flex-col items-center justify-center p-4 {matchup.team_a_wins >
@@ -159,20 +157,12 @@
             class="flex items-center justify-center gap-2 py-1.5 border-t border-(--color-border-subtle) bg-(--color-surface-inset)"
           >
             {#if matchup.is_complete}
-              <span
-                class="badge badge-info"
-                >FINAL</span
-              >
+              <span class="badge badge-info">FINAL</span>
             {:else}
-              <span
-                class="badge badge-success"
-                >LIVE</span
-              >
+              <span class="badge badge-success">LIVE</span>
             {/if}
             {#if matchup.ties > 0}
-              <span class="badge"
-                >{matchup.ties} TIES</span
-              >
+              <span class="badge">{matchup.ties} TIES</span>
             {/if}
           </div>
         </div>

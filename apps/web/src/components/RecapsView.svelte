@@ -62,9 +62,7 @@
   <!-- News Stream (Main Content) - Order 1 on mobile, 2 on desktop -->
   <main class="order-2 lg:order-1 min-w-0">
     {#if loading}
-      <div
-        class="card p-8"
-      >
+      <div class="card p-8">
         <div class="skeleton h-6 w-48 mb-4"></div>
         <div class="space-y-3">
           <div class="skeleton h-4 w-full"></div>
@@ -97,10 +95,10 @@
                 ? 'border-l-(--color-border-commissioner) bg-(--color-surface)'
                 : 'border-l-(--color-text-muted) bg-(--color-surface-base)'} p-8 border border-(--color-border) shadow-xl"
             >
-              <div
-                class="shrink-0 sm:w-44"
-              >
-                <div class="flex flex-wrap items-center gap-2 mb-3 sm:flex-col sm:items-start sm:gap-2">
+              <div class="shrink-0 sm:w-44">
+                <div
+                  class="flex flex-wrap items-center gap-2 mb-3 sm:flex-col sm:items-start sm:gap-2"
+                >
                   <span
                     class="font-mono text-[0.6rem] font-bold tracking-widest text-(--color-text-muted)"
                     >VOL. 2026 // ISSUE #{recap.week
@@ -122,12 +120,8 @@
                 <div
                   class="font-mono text-[0.55rem] text-(--color-text-muted) space-y-0.5 mt-2"
                 >
-                  <div
-                    class="hidden"
-                  ></div>
-                  <div
-                    class="hidden"
-                  ></div>
+                  <div class="hidden"></div>
+                  <div class="hidden"></div>
                   {#if recap.published_at}
                     <div>TS: {new Date(recap.published_at).toISOString()}</div>
                   {/if}
@@ -193,9 +187,7 @@
 </div>
 
 <div class="mt-6 text-center">
-  <p
-    class="font-mono text-[0.6rem] text-(--color-text-muted) tracking-wide"
-  >
+  <p class="font-mono text-[0.6rem] text-(--color-text-muted) tracking-wide">
     // WEEKLY RECAPS GENERATED WITH AI ASSISTANCE //
   </p>
 </div>

@@ -349,16 +349,9 @@
     class="flex flex-col items-center justify-center min-h-[60vh] text-center px-4"
   >
     <div class="relative w-full max-w-md">
-      <div
-        class="hidden"
-      ></div>
-      <div
-        class="hidden"
-      ></div>
-      <div
-        class="hidden"
-        style="animation-duration: 18s"
-      ></div>
+      <div class="hidden"></div>
+      <div class="hidden"></div>
+      <div class="hidden" style="animation-duration: 18s"></div>
     </div>
     <div class="w-full max-w-md">
       <div class="mb-6">
@@ -372,9 +365,7 @@
         >
           Warming Up
         </h1>
-        <p
-          class="font-mono text-[0.6rem] text-(--color-text-muted) mt-2"
-        >
+        <p class="font-mono text-[0.6rem] text-(--color-text-muted) mt-2">
           Queuing workers · Waiting for commissioner OAuth handshake · Syncing
           datapipes
         </p>
@@ -419,15 +410,15 @@
     </div>
   </section>
 {:else if error}
-  <div class="card p-6 border-l-4 border-l-(--color-danger) font-mono text-sm text-(--color-danger)">{error}</div>
+  <div
+    class="card p-6 border-l-4 border-l-(--color-danger) font-mono text-sm text-(--color-danger)"
+  >
+    {error}
+  </div>
 {:else}
   <div class="space-y-8">
-    <div
-      class="grid grid-cols-2 md:grid-cols-4 gap-3"
-    >
-      <div
-        class="card p-4"
-      >
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div class="card p-4">
         <div
           class="font-mono text-[0.55rem] font-bold tracking-widest text-(--color-text-muted) mb-1"
         >
@@ -444,9 +435,7 @@
           {overview.user_count ?? "-"}
         </p>
       </div>
-      <div
-        class="card p-4"
-      >
+      <div class="card p-4">
         <div
           class="font-mono text-[0.55rem] font-bold tracking-widest text-(--color-text-muted) mb-1"
         >
@@ -463,9 +452,7 @@
           {overview.team_count ?? "-"}
         </p>
       </div>
-      <div
-        class="card p-4"
-      >
+      <div class="card p-4">
         <div
           class="font-mono text-[0.55rem] font-bold tracking-widest text-(--color-text-muted) mb-1"
         >
@@ -482,9 +469,7 @@
           {overview.player_count ?? "-"}
         </p>
       </div>
-      <div
-        class="card p-4"
-      >
+      <div class="card p-4">
         <div
           class="font-mono text-[0.55rem] font-bold tracking-widest text-(--color-text-muted) mb-1"
         >
@@ -504,14 +489,14 @@
     </div>
 
     <div class="space-y-4">
-      <div
-        class="flex items-center gap-3"
-      >
+      <div class="flex items-center gap-3">
         <span
           class="font-mono text-[0.55rem] font-bold tracking-widest text-(--color-text-muted)"
           >01</span
         >
-        <h2 class="font-display text-xl font-extrabold tracking-tight text-(--color-text)">
+        <h2
+          class="font-display text-xl font-extrabold tracking-tight text-(--color-text)"
+        >
           DATA SYNCHRONIZATION
         </h2>
       </div>
@@ -525,9 +510,7 @@
       {/if}
 
       <!-- Job Controls -->
-      <div
-        class="space-y-3"
-      >
+      <div class="space-y-3">
         <div
           class={`border-2 px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-[0.35em] ${
             overview?.job_stop_active
@@ -542,10 +525,7 @@
           {/if}
         </div>
         <div class="flex flex-wrap gap-2">
-          <button
-            onclick={refreshJobStatus}
-            class="btn btn-secondary text-xs"
-          >
+          <button onclick={refreshJobStatus} class="btn btn-secondary text-xs">
             REFRESH JOB STATUS
           </button>
           <button
@@ -579,9 +559,7 @@
                 // {group.description}
               </p>
             </div>
-            <div
-              class="grid gap-2 {group.columns}"
-            >
+            <div class="grid gap-2 {group.columns}">
               {#each group.jobs as job}
                 {@const statusData = overview?.job_statuses?.find(
                   (s: any) => s.job_name === job.name,
@@ -647,42 +625,33 @@
     </div>
 
     <div class="space-y-4">
-      <div
-        class="flex items-center justify-between"
-      >
+      <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
           <span
             class="font-mono text-[0.55rem] font-bold tracking-widest text-(--color-text-muted)"
             >02</span
           >
-          <h2 class="font-display text-xl font-extrabold tracking-tight text-(--color-text)">
+          <h2
+            class="font-display text-xl font-extrabold tracking-tight text-(--color-text)"
+          >
             ACTIVE ALERTS
           </h2>
           {#if activeNotifications.length > 0}
-            <span
-              class="badge badge-danger"
-            >
+            <span class="badge badge-danger">
               {activeNotifications.length} UNREAD
             </span>
           {/if}
         </div>
         {#if activeNotifications.length > 0}
-          <button
-            onclick={markAllRead}
-            class="btn btn-secondary text-xs"
-          >
+          <button onclick={markAllRead} class="btn btn-secondary text-xs">
             CLEAR ALL
           </button>
         {/if}
       </div>
 
       {#if activeNotifications.length === 0}
-        <div
-          class="card p-6 text-center"
-        >
-          <p
-            class="font-mono text-xs text-(--color-text-muted)"
-          >
+        <div class="card p-6 text-center">
+          <p class="font-mono text-xs text-(--color-text-muted)">
             // ZERO UNREAD INTERRUPTS //
           </p>
         </div>
@@ -709,14 +678,11 @@
                   <span
                     class="font-mono text-[0.55rem] text-(--color-text-muted)"
                   >
-                    <span class="hidden"
-                    ></span>
+                    <span class="hidden"></span>
                     {new Date(notif.created_at).toLocaleString()}
                   </span>
                 </div>
-                <p
-                  class="font-mono text-xs text-(--color-text-muted)"
-                >
+                <p class="font-mono text-xs text-(--color-text-muted)">
                   > {notif.message}
                 </p>
               </div>
@@ -733,21 +699,19 @@
     </div>
 
     <div class="space-y-4">
-      <div
-        class="flex items-center justify-between"
-      >
+      <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
           <span
             class="font-mono text-[0.55rem] font-bold tracking-widest text-(--color-text-muted)"
             >03</span
           >
-          <h2 class="font-display text-xl font-extrabold tracking-tight text-(--color-text)">
+          <h2
+            class="font-display text-xl font-extrabold tracking-tight text-(--color-text)"
+          >
             CLEARED LOG
           </h2>
           {#if clearedNotifications.length > 0}
-            <span
-              class="badge"
-            >
+            <span class="badge">
               {clearedNotifications.length} TOTAL
             </span>
           {/if}
@@ -782,23 +746,15 @@
       </div>
 
       {#if clearedNotifications.length === 0}
-        <div
-          class="card p-6 text-center"
-        >
-          <p
-            class="font-mono text-xs text-(--color-text-muted)"
-          >
+        <div class="card p-6 text-center">
+          <p class="font-mono text-xs text-(--color-text-muted)">
             // NO CLEARED ENTRIES //
           </p>
         </div>
       {:else}
-        <div
-          class="space-y-2"
-        >
+        <div class="space-y-2">
           {#each clearedPageItems as notif}
-            <div
-              class="card p-4 opacity-60"
-            >
+            <div class="card p-4 opacity-60">
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2 mb-1">
                   <span
@@ -819,9 +775,7 @@
                     {new Date(notif.created_at).toLocaleString()}
                   </span>
                 </div>
-                <p
-                  class="font-mono text-xs text-(--color-text-muted)"
-                >
+                <p class="font-mono text-xs text-(--color-text-muted)">
                   > {notif.message}
                 </p>
               </div>

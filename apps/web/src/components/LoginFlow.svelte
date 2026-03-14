@@ -53,7 +53,9 @@
     {loading ? "Connecting..." : "Continue with Yahoo"}
   </button>
 
-  <p class="font-mono text-[0.65rem] text-(--color-text-muted) text-center leading-relaxed">
+  <p
+    class="font-mono text-[0.65rem] text-(--color-text-muted) text-center leading-relaxed"
+  >
     Read-only access to your fantasy league data. We never modify your Yahoo
     account.
   </p>

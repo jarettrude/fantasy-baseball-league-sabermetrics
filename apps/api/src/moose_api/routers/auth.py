@@ -123,9 +123,6 @@ async def callback(
             detail="Could not retrieve Yahoo GUID",
         )
 
-    if not display_name:
-        display_name = yahoo_guid
-
     is_commissioner = yahoo_guid == settings.commissioner_yahoo_guid
 
     from moose_api.models.league import League
@@ -149,7 +146,8 @@ async def callback(
         membership_check = await db.execute(
             select(Team).where(Team.yahoo_manager_guid == yahoo_guid, Team.league_id == league.id)
         )
-        if not membership_check.scalar_one_or_none():
+        member_team = membership_check.scalar_one_or_none()
+        if not member_team:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Access denied: You are not a manager in league {settings.yahoo_league_id}.",
@@ -158,11 +156,12 @@ async def callback(
 
     result = await db.execute(select(User).where(User.yahoo_guid == yahoo_guid))
     user = result.scalar_one_or_none()
+    resolved_display_name = display_name or (user.display_name if user and user.display_name else yahoo_guid)
 
     if user is None:
         user = User(
             yahoo_guid=yahoo_guid,
-            display_name=display_name,
+            display_name=resolved_display_name,
             role=role,
             last_login=datetime.now(UTC),
         )
@@ -170,8 +169,12 @@ async def callback(
         await db.flush()
     else:
         user.role = role
-        user.display_name = display_name
+        user.display_name = resolved_display_name
         user.last_login = datetime.now(UTC)
+        await db.flush()
+
+    if role == "manager":
+        member_team.manager_user_id = user.id
         await db.flush()
 
     existing_token = await db.execute(select(YahooToken).where(YahooToken.user_id == user.id))
@@ -209,8 +212,6 @@ async def callback(
     # On first commissioner login: mark system ready and enqueue preseason setup
     if role == "commissioner" and await mark_bootstrap_ready():
         await enqueue_post_bootstrap_jobs()
-
-    from moose_api.models.team import Team
 
     team_result = await db.execute(select(Team).where(Team.manager_user_id == user.id))
     team = team_result.scalar_one_or_none()

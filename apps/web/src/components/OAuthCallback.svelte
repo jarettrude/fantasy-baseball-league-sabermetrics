@@ -83,9 +83,7 @@
       >
         AUTHORIZATION GRANTED //
       </p>
-      <p
-        class="font-mono text-xs text-(--color-text-muted) animate-pulse-dot"
-      >
+      <p class="font-mono text-xs text-(--color-text-muted) animate-pulse-dot">
         ROUTING TO FRONT OFFICE
       </p>
     </div>
@@ -113,17 +111,10 @@
       >
         AUTHORIZATION FAILED //
       </p>
-      <p
-        class="font-mono text-xs text-(--color-text-muted)"
-      >
+      <p class="font-mono text-xs text-(--color-text-muted)">
         {errorMsg}
       </p>
-      <a
-        href="/login"
-        class="btn btn-primary mt-2"
-      >
-        RE-INITIALIZE //
-      </a>
+      <a href="/login" class="btn btn-primary mt-2"> RE-INITIALIZE // </a>
     </div>
   {/if}
 </div>

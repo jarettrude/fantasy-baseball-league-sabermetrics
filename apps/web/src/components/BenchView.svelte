@@ -186,7 +186,9 @@
   <div class="space-y-3">
     <div class="card overflow-hidden">
       {#each [1, 2, 3, 4, 5] as _}
-        <div class="flex items-center gap-4 px-4 py-3 border-b border-(--color-border-subtle)">
+        <div
+          class="flex items-center gap-4 px-4 py-3 border-b border-(--color-border-subtle)"
+        >
           <div class="skeleton h-4 w-28"></div>
           <div class="skeleton h-4 w-12"></div>
           <div class="skeleton h-4 w-16"></div>
@@ -195,7 +197,11 @@
     </div>
   </div>
 {:else if error}
-  <div class="card p-6 border-l-4 border-l-(--color-danger) font-mono text-sm text-(--color-danger)">{error}</div>
+  <div
+    class="card p-6 border-l-4 border-l-(--color-danger) font-mono text-sm text-(--color-danger)"
+  >
+    {error}
+  </div>
 {:else if data}
   <div
     class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6"
@@ -217,15 +223,9 @@
         {data.team_name}
       </p>
     </div>
-    <div
-      class="flex flex-col gap-1 text-right"
-    >
-      <div
-        class="hidden"
-      ></div>
-      <div
-        class="hidden"
-      ></div>
+    <div class="flex flex-col gap-1 text-right">
+      <div class="hidden"></div>
+      <div class="hidden"></div>
       <div class="font-mono text-[0.6rem] text-(--color-text-muted)">
         {#if freshnessWarning(data.season_value_updated)}
           <span
@@ -260,18 +260,14 @@
   </div>
 
   {#if data.briefing}
-    <div
-      class="card p-5 mb-6 border-l-4 border-l-(--color-info)"
-    >
+    <div class="card p-5 mb-6 border-l-4 border-l-(--color-info)">
       <div class="mb-3">
         <span
           class="font-mono text-xs font-bold tracking-widest uppercase text-(--color-info)"
         >
           MORNING BRIEFING
         </span>
-        <p
-          class="font-mono text-[0.6rem] text-(--color-text-muted) mt-0.5"
-        >
+        <p class="font-mono text-[0.6rem] text-(--color-text-muted) mt-0.5">
           // DATE: {data.briefing.date}
         </p>
       </div>
@@ -289,9 +285,7 @@
         >
           ROSTER ALERT
         </span>
-        <p
-          class="font-mono text-[0.6rem] text-(--color-text-muted) mt-0.5"
-        >
+        <p class="font-mono text-[0.6rem] text-(--color-text-muted) mt-0.5">
           // ROSTER INEFFICIENCIES DETECTED
         </p>
       </div>
@@ -300,14 +294,10 @@
           <div
             class="flex items-center gap-2 rounded-sm bg-(--color-warning-muted) border border-(--color-warning)/30 px-3 py-2"
           >
-            <div
-              class="font-display text-sm font-bold text-(--color-text)"
-            >
+            <div class="font-display text-sm font-bold text-(--color-text)">
               {slot.player.name}
             </div>
-            <div
-              class="font-mono text-xs font-bold text-(--color-warning)"
-            >
+            <div class="font-mono text-xs font-bold text-(--color-warning)">
               {Number(slot.season_value?.composite_value ?? 0).toFixed(2)}
             </div>
           </div>
@@ -323,14 +313,10 @@
       // NO ROSTER DATA // SYNC REQUIRED //
     </div>
   {:else}
-    <div
-      class="card overflow-x-auto"
-    >
+    <div class="card overflow-x-auto">
       <table class="w-full text-sm">
         <thead>
-          <tr
-            class="border-b border-(--color-border)"
-          >
+          <tr class="border-b border-(--color-border)">
             <th class="px-3 py-2.5 text-left">
               <button
                 onclick={() => sort("name")}
@@ -449,30 +435,33 @@
               >
                 {slot.season_value?.our_rank || "—"}
               </td>
-              <td
-                class="px-2 py-2.5 text-center hidden xl:table-cell"
-              >
+              <td class="px-2 py-2.5 text-center hidden xl:table-cell">
                 {#if slot.season_value?.roster_percent !== null && slot.season_value?.roster_percent !== undefined}
                   <div class="flex items-center justify-center gap-1">
                     <span class="font-mono text-xs text-(--color-text-muted)"
                       >{slot.season_value.roster_percent}%</span
                     >
-                    {#if slot.season_value.roster_trend && slot.season_value.roster_trend > 0}
-                      <span class="font-mono text-[0.6rem] text-(--color-success)"
+                    {#if slot.season_value.roster_trend !== null && slot.season_value.roster_trend !== undefined && slot.season_value.roster_trend > 0}
+                      <span
+                        class="font-mono text-[0.6rem] text-(--color-success)"
                         >+{slot.season_value.roster_trend.toFixed(1)}</span
                       >
-                    {:else if slot.season_value.roster_trend && slot.season_value.roster_trend < 0}
-                      <span class="font-mono text-[0.6rem] text-(--color-danger)"
+                    {:else if slot.season_value.roster_trend !== null && slot.season_value.roster_trend !== undefined && slot.season_value.roster_trend < 0}
+                      <span
+                        class="font-mono text-[0.6rem] text-(--color-danger)"
                         >{slot.season_value.roster_trend.toFixed(1)}</span
                       >
                     {:else}
-                      <span class="font-mono text-[0.6rem] text-(--color-text-muted)"
+                      <span
+                        class="font-mono text-[0.6rem] text-(--color-text-muted)"
                         >—</span
                       >
                     {/if}
                   </div>
                 {:else}
-                  <span class="font-mono text-xs text-(--color-text-muted)">—</span>
+                  <span class="font-mono text-xs text-(--color-text-muted)"
+                    >—</span
+                  >
                 {/if}
               </td>
               <td
@@ -499,10 +488,7 @@
                 {/if}
               </td>
               <td class="px-2 py-2.5 text-center hidden sm:table-cell">
-                <span
-                  class="badge"
-                  >{slot.position}</span
-                >
+                <span class="badge">{slot.position}</span>
               </td>
               <td
                 class="px-2 py-2.5 text-center font-mono text-xs font-bold {Number(

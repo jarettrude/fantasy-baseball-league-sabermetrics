@@ -26,9 +26,7 @@ if (error) {
     class="relative flex min-h-screen items-center justify-center px-page py-16"
   >
     <!-- Standard Grid Background -->
-    <div
-      class="absolute inset-0 opacity-[0.03] pointer-events-none grid-bg"
-    >
+    <div class="absolute inset-0 opacity-[0.03] pointer-events-none grid-bg">
     </div>
 
     <div class="relative w-full max-w-md animate-fade-in">
@@ -71,26 +69,16 @@ if (error) {
             // {description}
           </p>
           <div class="h-px bg-(--color-border)"></div>
-          <p
-            class="text-sm text-(--color-text-secondary) leading-relaxed"
-          >
+          <p class="text-sm text-(--color-text-secondary) leading-relaxed">
             {suggestion}
           </p>
         </div>
 
         <div class="flex flex-col sm:flex-row gap-3 justify-center">
-          <button
-            onclick="window.location.reload()"
-            class="btn btn-primary"
-          >
+          <button onclick="window.location.reload()" class="btn btn-primary">
             RE-CALIBRATE // REFRESH
           </button>
-          <a
-            href="/"
-            class="btn btn-secondary"
-          >
-            EXIT TO HUB
-          </a>
+          <a href="/" class="btn btn-secondary"> EXIT TO HUB </a>
         </div>
 
         <div class="pt-4 border-t border-(--color-border-subtle)">

@@ -165,7 +165,8 @@
       return "bg-(--color-success-muted) text-(--color-success) border-(--color-success)";
     if (s === "ambiguous")
       return "bg-(--color-warning-muted) text-(--color-warning) border-(--color-warning)";
-    if (s === "manual") return "bg-(--color-info-muted) text-(--color-info) border-(--color-info)";
+    if (s === "manual")
+      return "bg-(--color-info-muted) text-(--color-info) border-(--color-info)";
     return "bg-(--color-surface-raised) text-(--color-text-muted) border-(--color-border)";
   }
 
@@ -264,28 +265,40 @@
     </div>
   {:else if filtered.length === 0}
     <div class="card p-8 text-center">
-      <p
-        class="font-mono text-sm text-(--color-text-muted)"
-      >
+      <p class="font-mono text-sm text-(--color-text-muted)">
         // NO ENTITIES DETECTED //
       </p>
     </div>
   {:else}
-    <div
-      class="card overflow-x-auto"
-    >
+    <div class="card overflow-x-auto">
       <table class="w-full text-sm">
         <thead>
-          <tr
-            class="border-b border-(--color-border)"
-          >
-            <th class="px-4 py-3 text-left font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted)">PLAYER IDENTITY</th>
-            <th class="px-3 py-3 text-left font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted) hidden md:table-cell">SYS_KEY (YAHOO)</th>
-            <th class="px-3 py-3 text-center font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted)">SYS_KEY (MLB)</th>
+          <tr class="border-b border-(--color-border)">
+            <th
+              class="px-4 py-3 text-left font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted)"
+              >PLAYER IDENTITY</th
+            >
+            <th
+              class="px-3 py-3 text-left font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted) hidden md:table-cell"
+              >SYS_KEY (YAHOO)</th
+            >
+            <th
+              class="px-3 py-3 text-center font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted)"
+              >SYS_KEY (MLB)</th
+            >
 
-            <th class="px-3 py-3 text-center font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted) hidden sm:table-cell">CONF_LVL</th>
-            <th class="px-3 py-3 text-center font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted)">STATE</th>
-            <th class="px-3 py-3 text-right font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted)">OVERRIDE</th>
+            <th
+              class="px-3 py-3 text-center font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted) hidden sm:table-cell"
+              >CONF_LVL</th
+            >
+            <th
+              class="px-3 py-3 text-center font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted)"
+              >STATE</th
+            >
+            <th
+              class="px-3 py-3 text-right font-mono text-[0.65rem] font-bold tracking-widest uppercase text-(--color-text-muted)"
+              >OVERRIDE</th
+            >
           </tr>
         </thead>
         <tbody class="divide-y divide-(--color-border-subtle)">
@@ -338,18 +351,12 @@
               </td>
 
               <td class="px-3 py-3 text-center">
-                <span
-                  class="badge {statusBadge(
-                    m.status,
-                  )}"
-                >
+                <span class="badge {statusBadge(m.status)}">
                   {m.status}
                 </span>
               </td>
 
-              <td
-                class="px-3 py-3 text-right"
-              >
+              <td class="px-3 py-3 text-right">
                 {#if editingId === m.id}
                   <div class="flex gap-1.5 justify-end">
                     <button
