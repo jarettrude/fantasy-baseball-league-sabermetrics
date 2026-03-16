@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, Float, ForeignKey, Integer, Text, func
+from sqlalchemy import Boolean, Date, Float, ForeignKey, Integer, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import ARRAY, TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -54,6 +54,8 @@ class PlayerMapping(Base):
     """
 
     __tablename__ = "player_mapping"
+
+    __table_args__ = (UniqueConstraint("yahoo_player_key", name="uq_player_mapping_yahoo_key"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     yahoo_player_key: Mapped[str] = mapped_column(Text, ForeignKey("player.yahoo_player_key"), nullable=False)
