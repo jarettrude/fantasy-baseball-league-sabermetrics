@@ -72,9 +72,10 @@ async def _fetch_fangraphs_data(stats_type: str) -> list[dict]:
 
                 # Polite delay
                 if attempt > 0:
-                    delay = 5 * (2 ** attempt)
+                    delay = 5 * (2**attempt)
                     logger.info("Backing off %ds before retry...", delay)
                     import asyncio
+
                     await asyncio.sleep(delay)
 
                 res = await client.get(FG_API_URL, params=params, headers=FG_HEADERS, timeout=30.0)
@@ -83,12 +84,14 @@ async def _fetch_fangraphs_data(stats_type: str) -> list[dict]:
                     retry_after = res.headers.get("Retry-After", "30")
                     logger.warning("FanGraphs rate limited (429), sleeping %ss", retry_after)
                     import asyncio
+
                     await asyncio.sleep(float(retry_after))
                     continue
 
                 if res.status_code == 403:
                     logger.warning("FanGraphs returned 403 — WAF may be blocking our requests")
                     import asyncio
+
                     await asyncio.sleep(10)
                     continue
 

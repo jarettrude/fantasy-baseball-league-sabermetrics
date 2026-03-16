@@ -24,7 +24,7 @@ YAHOO_API_BASE = "https://fantasysports.yahooapis.com/fantasy/v2"
 
 
 class YahooAPIError(Exception):
-    pass
+    """Raised when Yahoo Fantasy Sports API requests fail."""
 
 
 class YahooLeagueMeta(BaseModel):

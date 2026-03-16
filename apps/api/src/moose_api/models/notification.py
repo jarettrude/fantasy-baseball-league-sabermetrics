@@ -1,3 +1,9 @@
+"""Commissioner notification system model.
+
+Stores messages and alerts for league commissioners including
+sync failures, system updates, and important league events.
+"""
+
 from datetime import datetime
 
 from sqlalchemy import Boolean, Integer, Text, func

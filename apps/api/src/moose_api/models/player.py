@@ -1,3 +1,10 @@
+"""Player data and cross-platform mapping models.
+
+Core player information from Yahoo Fantasy Sports with cross-references
+to MLB Stats API and Lahman database. Handles two-way players (like Ohtani)
+with separate entries for batting and pitching roles.
+"""
+
 from datetime import date, datetime
 
 from sqlalchemy import Boolean, Date, Float, ForeignKey, Integer, Text, UniqueConstraint, func
