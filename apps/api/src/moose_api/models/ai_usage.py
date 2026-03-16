@@ -1,3 +1,9 @@
+"""AI usage tracking model for monitoring and cost management.
+
+Stores records of AI API calls including model usage, token counts,
+and associated costs for budget tracking and analytics.
+"""
+
 from datetime import datetime
 from decimal import Decimal
 

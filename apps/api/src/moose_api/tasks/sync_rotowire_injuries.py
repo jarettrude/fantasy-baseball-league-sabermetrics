@@ -55,9 +55,7 @@ async def _estimate_missed_games(note: str, status: str) -> int:
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=2, min=5, max=30),
-    retry=retry_if_exception_type(
-        (httpx.ReadError, httpx.ConnectError, httpx.TimeoutException, httpx.HTTPStatusError)
-    ),
+    retry=retry_if_exception_type((httpx.ReadError, httpx.ConnectError, httpx.TimeoutException, httpx.HTTPStatusError)),
     reraise=True,
 )
 async def _fetch_rotowire_injuries() -> list[dict]:

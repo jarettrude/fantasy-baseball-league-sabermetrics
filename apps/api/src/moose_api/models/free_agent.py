@@ -1,3 +1,10 @@
+"""Free agent availability tracking model.
+
+Records snapshots of player availability over time to track trends
+in free agent pool composition and player movement between teams
+and the waiver wire.
+"""
+
 from datetime import datetime
 
 from sqlalchemy import Boolean, ForeignKey, Integer, func

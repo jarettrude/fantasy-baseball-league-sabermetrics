@@ -22,6 +22,12 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    """Add unique constraint to player_mapping and deduplicate existing rows.
+
+    Removes duplicate player mappings, keeping the entry with highest confidence
+    score (and highest ID as tiebreaker) for each yahoo_player_key, then adds
+    a unique constraint to prevent future duplicates.
+    """
     conn = op.get_bind()
 
     # Delete duplicate player_mapping rows, keeping the one with the highest
@@ -45,4 +51,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Remove the unique constraint to allow duplicate mappings again.
+
+    Reverts the schema change but does not restore any deduplicated rows.
+    """
     op.drop_constraint("uq_player_mapping_yahoo_key", "player_mapping", type_="unique")

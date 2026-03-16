@@ -1,3 +1,9 @@
+"""League configuration and metadata model.
+
+Stores fantasy league settings, scoring rules, and current season state.
+Manages league-wide configuration that affects gameplay and calculations.
+"""
+
 from datetime import datetime
 
 from sqlalchemy import Integer, Text, func

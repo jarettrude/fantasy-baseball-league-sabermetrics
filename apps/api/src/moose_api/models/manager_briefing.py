@@ -1,3 +1,10 @@
+"""AI-generated manager briefing model.
+
+Stores personalized team insights and recommendations generated
+by AI for fantasy team managers. Includes strategic advice,
+waiver wire suggestions, and matchup analysis.
+"""
+
 from datetime import date, datetime
 
 from sqlalchemy import Boolean, Date, ForeignKey, Integer, Text, func

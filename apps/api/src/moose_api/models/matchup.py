@@ -1,3 +1,9 @@
+"""Weekly matchup tracking model.
+
+Stores head-to-head matchups between teams for each week of the
+fantasy season, including scores and winner determination.
+"""
+
 from datetime import datetime
 
 from sqlalchemy import Boolean, ForeignKey, Integer, UniqueConstraint, func
