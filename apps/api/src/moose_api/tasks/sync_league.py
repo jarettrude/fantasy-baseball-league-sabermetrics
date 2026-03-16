@@ -87,15 +87,19 @@ async def run_sync_league_meta():
                 await session.flush()
             else:
                 if league.num_teams != meta.num_teams and league.num_teams != 0:
+                    logger.warning(
+                        "Yahoo num_teams (%d) differs from DB (%d) — reconciling teams",
+                        meta.num_teams,
+                        league.num_teams,
+                    )
                     notif = CommissionerNotification(
-                        type="sync_failure",
+                        type="info",
                         message=(
-                            f"Yahoo num_teams ({meta.num_teams}) differs from DB ({league.num_teams}). Sync aborted."
+                            f"League team count changed: Yahoo={meta.num_teams}, DB={league.num_teams}. "
+                            f"Reconciling team list now."
                         ),
                     )
                     session.add(notif)
-                    await session.commit()
-                    return
 
                 league.name = meta.name
                 league.num_teams = meta.num_teams
@@ -105,6 +109,8 @@ async def run_sync_league_meta():
                 league.end_week = meta.end_week
                 league.stat_categories = meta.stat_categories
                 league.roster_positions = meta.roster_positions
+
+            yahoo_team_keys = {t.team_key for t in standings}
 
             for team_data in standings:
                 team_result = await session.execute(select(Team).where(Team.yahoo_team_key == team_data.team_key))
@@ -141,6 +147,17 @@ async def run_sync_league_meta():
                     team.yahoo_manager_guid = team_data.manager_guid
                     if manager_user:
                         team.manager_user_id = manager_user.id
+
+            # Remove teams that are no longer in Yahoo (dropped out of league)
+            existing_teams_result = await session.execute(select(Team).where(Team.league_id == league.id))
+            for team in existing_teams_result.scalars().all():
+                if team.yahoo_team_key not in yahoo_team_keys:
+                    logger.warning(
+                        "Removing team %s (%s) — no longer in Yahoo standings",
+                        team.name,
+                        team.yahoo_team_key,
+                    )
+                    await session.delete(team)
 
             await session.commit()
             await invalidate_cache("league:standings", "league:info")

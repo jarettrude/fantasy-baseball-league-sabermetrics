@@ -68,6 +68,22 @@ def _normalize_name(name: str) -> str:
     return name.strip()
 
 
+def _upsert_mapping(session, existing_mappings: dict, yahoo_player_key: str, **kwargs) -> PlayerMapping:
+    """Return an existing PlayerMapping (updated in-place) or create a new one.
+
+    Prevents duplicate rows for the same yahoo_player_key across repeated pipeline runs.
+    """
+    mapping = existing_mappings.get(yahoo_player_key)
+    if mapping is None:
+        mapping = PlayerMapping(yahoo_player_key=yahoo_player_key, **kwargs)
+        existing_mappings[yahoo_player_key] = mapping
+        session.add(mapping)
+    else:
+        for key, value in kwargs.items():
+            setattr(mapping, key, value)
+    return mapping
+
+
 async def run_resolve_player_mappings(refresh_ambiguous: bool = True):
     """Run the 5-stage mapping pipeline for all unmapped players.
 
@@ -142,8 +158,10 @@ async def run_resolve_player_mappings(refresh_ambiguous: bool = True):
 
             logger.info("Stage 1: Processing %d players with existing MLB IDs", len(players_with_mlb_id))
             for player in players_with_mlb_id:
-                mapping = PlayerMapping(
-                    yahoo_player_key=player.yahoo_player_key,
+                _upsert_mapping(
+                    session,
+                    existing_mappings,
+                    player.yahoo_player_key,
                     mlb_id=player.mlb_id,
                     lahman_id=None,
                     source_confidence=1.0,
@@ -151,7 +169,6 @@ async def run_resolve_player_mappings(refresh_ambiguous: bool = True):
                     status="confirmed",
                     notes="Stage 1: direct mlb_id",
                 )
-                session.add(mapping)
                 resolved += 1
 
             if players_with_mlb_id:
@@ -189,8 +206,10 @@ async def run_resolve_player_mappings(refresh_ambiguous: bool = True):
                     if y_id in yahoo_to_mlb:
                         mlb_id = yahoo_to_mlb[y_id]
                         player.mlb_id = mlb_id
-                        mapping = PlayerMapping(
-                            yahoo_player_key=player.yahoo_player_key,
+                        _upsert_mapping(
+                            session,
+                            existing_mappings,
+                            player.yahoo_player_key,
                             mlb_id=mlb_id,
                             lahman_id=None,
                             source_confidence=0.98,
@@ -198,7 +217,6 @@ async def run_resolve_player_mappings(refresh_ambiguous: bool = True):
                             status="confirmed",
                             notes="Stage 1.5: baseball_id package",
                         )
-                        session.add(mapping)
                         resolved += 1
                     else:
                         still_needing_search.append(player)
@@ -245,15 +263,6 @@ async def run_resolve_player_mappings(refresh_ambiguous: bool = True):
                         for player in batch_players:
                             normalized_name = _normalize_name(player.name)
 
-                            mapping = PlayerMapping(
-                                yahoo_player_key=player.yahoo_player_key,
-                                mlb_id=None,
-                                lahman_id=None,
-                                source_confidence=0.0,
-                                auto_mapped=True,
-                                status="ambiguous",
-                            )
-
                             matched_result = None
                             for result in batch_results:
                                 if result.get("fullName", "").lower() == normalized_name.lower():
@@ -267,16 +276,32 @@ async def run_resolve_player_mappings(refresh_ambiguous: bool = True):
                                         break
 
                             if matched_result:
-                                mapping.mlb_id = matched_result["id"]
-                                mapping.source_confidence = 0.95
-                                mapping.status = "confirmed"
-                                mapping.notes = f"Stage 2: MLB API batch match (id={matched_result['id']})"
+                                _upsert_mapping(
+                                    session,
+                                    existing_mappings,
+                                    player.yahoo_player_key,
+                                    mlb_id=matched_result["id"],
+                                    lahman_id=None,
+                                    source_confidence=0.95,
+                                    auto_mapped=True,
+                                    status="confirmed",
+                                    notes=f"Stage 2: MLB API batch match (id={matched_result['id']})",
+                                )
                                 stage_2_confirmed_keys.add(player.yahoo_player_key)
                                 resolved += 1
                             else:
+                                _upsert_mapping(
+                                    session,
+                                    existing_mappings,
+                                    player.yahoo_player_key,
+                                    mlb_id=None,
+                                    lahman_id=None,
+                                    source_confidence=0.0,
+                                    auto_mapped=True,
+                                    status="ambiguous",
+                                    notes=None,
+                                )
                                 ambiguous += 1
-
-                            session.add(mapping)
 
                     except Exception as e:
                         logger.error(
@@ -285,8 +310,10 @@ async def run_resolve_player_mappings(refresh_ambiguous: bool = True):
                             e,
                         )
                         for player in batch_players:
-                            mapping = PlayerMapping(
-                                yahoo_player_key=player.yahoo_player_key,
+                            _upsert_mapping(
+                                session,
+                                existing_mappings,
+                                player.yahoo_player_key,
                                 mlb_id=None,
                                 lahman_id=None,
                                 source_confidence=0.0,
@@ -294,7 +321,6 @@ async def run_resolve_player_mappings(refresh_ambiguous: bool = True):
                                 status="ambiguous",
                                 notes=f"Stage 2: batch search failed - {e}",
                             )
-                            session.add(mapping)
                             ambiguous += 1
 
                 await session.commit()
@@ -310,26 +336,24 @@ async def run_resolve_player_mappings(refresh_ambiguous: bool = True):
                     normalized_name = _normalize_name(player.name)
                     rkey = normalized_name.lower()
 
-                    mapping = PlayerMapping(
-                        yahoo_player_key=player.yahoo_player_key,
-                        mlb_id=None,
-                        lahman_id=None,
-                        source_confidence=0.0,
-                        auto_mapped=True,
-                        status="ambiguous",
-                    )
-
                     if rkey in roster_by_name:
                         mp = roster_by_name[rkey]
-                        mapping.mlb_id = mp["mlb_id"]
-                        mapping.source_confidence = 0.90
-                        mapping.status = "confirmed"
-                        mapping.notes = f"Stage 3: MLB roster exact name match (id={mp['mlb_id']})"
                         player.mlb_id = mp["mlb_id"]
                         if mp.get("bats") and not player.bats:
                             player.bats = mp["bats"]
                         if mp.get("throws") and not player.throws:
                             player.throws = mp["throws"]
+                        _upsert_mapping(
+                            session,
+                            existing_mappings,
+                            player.yahoo_player_key,
+                            mlb_id=mp["mlb_id"],
+                            lahman_id=None,
+                            source_confidence=0.90,
+                            auto_mapped=True,
+                            status="confirmed",
+                            notes=f"Stage 3: MLB roster exact name match (id={mp['mlb_id']})",
+                        )
                         resolved += 1
                     else:
                         # ── Stage 4: Fuzzy match (Jaro-Winkler >= 0.92) ──
@@ -342,16 +366,32 @@ async def run_resolve_player_mappings(refresh_ambiguous: bool = True):
                                 best_match = mp
 
                         if best_match:
-                            mapping.mlb_id = best_match["mlb_id"]
-                            mapping.source_confidence = round(best_score, 3)
-                            mapping.status = "confirmed"
-                            mapping.notes = f"Stage 4: fuzzy match ({best_match['full_name']}, score={best_score:.3f})"
                             player.mlb_id = best_match["mlb_id"]
+                            _upsert_mapping(
+                                session,
+                                existing_mappings,
+                                player.yahoo_player_key,
+                                mlb_id=best_match["mlb_id"],
+                                lahman_id=None,
+                                source_confidence=round(best_score, 3),
+                                auto_mapped=True,
+                                status="confirmed",
+                                notes=f"Stage 4: fuzzy match ({best_match['full_name']}, score={best_score:.3f})",
+                            )
                             resolved += 1
                         else:
+                            _upsert_mapping(
+                                session,
+                                existing_mappings,
+                                player.yahoo_player_key,
+                                mlb_id=None,
+                                lahman_id=None,
+                                source_confidence=0.0,
+                                auto_mapped=True,
+                                status="ambiguous",
+                                notes=None,
+                            )
                             ambiguous += 1
-
-                    session.add(mapping)
 
                 await session.commit()
                 logger.info("Stage 3/4: Committed %d mappings", resolved)

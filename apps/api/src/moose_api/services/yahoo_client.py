@@ -381,8 +381,8 @@ class YahooClient:
 
         return players
 
-    async def get_free_agents(self, league_key: str, start: int = 0, count: int = 50) -> list[YahooPlayerData]:
-        url = f"{YAHOO_API_BASE}/league/{league_key}/players;status=FA;out=ranks;start={start};count={count}"
+    async def get_free_agents(self, league_key: str, start: int = 0, count: int = 25) -> list[YahooPlayerData]:
+        url = f"{YAHOO_API_BASE}/league/{league_key}/players;status=A;out=ranks;start={start};count={count}"
         # Free agents pool caching - 1 hour is safe for big batches
         raw = await self._request(url, cache_ttl=3600)
         root = ET.fromstring(raw)

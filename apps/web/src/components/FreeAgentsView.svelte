@@ -295,7 +295,7 @@
                 Player{sortIcon("name")}
               </button>
             </th>
-            <th class="px-2 py-2.5 text-center hidden lg:table-cell">
+            <th class="px-2 py-2.5 text-center">
               <button
                 onclick={() => sort("y_rank")}
                 class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-text-muted) hover:text-(--color-text) cursor-pointer"
@@ -304,7 +304,7 @@
                 Y! Rank{sortIcon("y_rank")}
               </button>
             </th>
-            <th class="px-2 py-2.5 text-center hidden lg:table-cell">
+            <th class="px-2 py-2.5 text-center">
               <button
                 onclick={() => sort("our_rank")}
                 class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-text-muted) hover:text-(--color-text) cursor-pointer"
@@ -315,6 +315,15 @@
             </th>
             <th class="px-2 py-2.5 text-center">
               <button
+                onclick={() => sort("next_value")}
+                class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-text-muted) hover:text-(--color-text) cursor-pointer"
+                title="Forecasted value over the next 7 days. Adjusted for missed games, 2-start pitchers, and Vegas Implied Win Odds (Matchups)."
+              >
+                Next Val{sortIcon("next_value")}
+              </button>
+            </th>
+            <th class="px-2 py-2.5 text-center hidden sm:table-cell">
+              <button
                 onclick={() => sort("position")}
                 class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-text-muted) hover:text-(--color-text) cursor-pointer"
                 title="Player's Primary Position"
@@ -322,6 +331,11 @@
                 Pos{sortIcon("position")}
               </button>
             </th>
+            <th
+              class="px-2 py-2.5 text-center font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-text-muted) hidden md:table-cell"
+              title="Official MLB Injury Status (e.g., IL10, IL60, DTD, ACTIVE)"
+              >Status</th
+            >
             <th class="px-2 py-2.5 text-center hidden md:table-cell">
               <button
                 onclick={() => sort("team")}
@@ -329,6 +343,15 @@
                 title="MLB Team Abbreviation"
               >
                 Team{sortIcon("team")}
+              </button>
+            </th>
+            <th class="px-2 py-2.5 text-center hidden lg:table-cell">
+              <button
+                onclick={() => sort("season_value")}
+                class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-text-muted) hover:text-(--color-text) cursor-pointer"
+                title="Internal Moose ranking based on customized z-score valuation"
+              >
+                Int{sortIcon("season_value")}
               </button>
             </th>
             <th class="px-2 py-2.5 text-center hidden xl:table-cell">
@@ -340,15 +363,6 @@
                 xStat{sortIcon("xstat")}
               </button>
             </th>
-            <th class="px-2 py-2.5 text-center">
-              <button
-                onclick={() => sort("season_value")}
-                class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-text-muted) hover:text-(--color-text) cursor-pointer"
-                title="Internal Moose ranking based on customized z-score valuation"
-              >
-                Int{sortIcon("season_value")}
-              </button>
-            </th>
             <th class="px-2 py-2.5 text-center hidden xl:table-cell">
               <button
                 onclick={() => sort("roster_percent")}
@@ -358,20 +372,6 @@
                 Rost%{sortIcon("roster_percent")}
               </button>
             </th>
-            <th class="px-2 py-2.5 text-center hidden sm:table-cell">
-              <button
-                onclick={() => sort("next_value")}
-                class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-text-muted) hover:text-(--color-text) cursor-pointer"
-                title="Forecasted value over the next 7 days. Adjusted for missed games, 2-start pitchers, and Vegas Implied Win Odds (Matchups)."
-              >
-                Next Val{sortIcon("next_value")}
-              </button>
-            </th>
-            <th
-              class="px-2 py-2.5 text-center font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-text-muted)"
-              title="Official MLB Injury Status (e.g., IL10, IL60, DTD, ACTIVE)"
-              >Status</th
-            >
           </tr>
         </thead>
         <tbody class="divide-y divide-(--color-border-subtle)">
@@ -382,21 +382,56 @@
                 >{fa.player.name}</td
               >
               <td
-                class="px-2 py-2.5 text-center font-mono text-xs text-(--color-text-muted) hidden lg:table-cell"
+                class="px-2 py-2.5 text-center font-mono text-xs text-(--color-text-muted)"
                 >{fa.season_value?.yahoo_rank || "-"}</td
               >
               <td
-                class="px-2 py-2.5 text-center font-mono text-xs text-(--color-text-muted) hidden lg:table-cell"
+                class="px-2 py-2.5 text-center font-mono text-xs text-(--color-text-muted)"
                 >{fa.season_value?.our_rank || "-"}</td
               >
               <td
-                class="px-2 py-2.5 text-center font-mono text-xs text-(--color-text-muted)"
+                class="px-2 py-2.5 text-center font-mono text-xs font-bold {Number(
+                  fa.next_games_value?.composite_value ?? 0,
+                ) > 0
+                  ? 'text-(--color-success)'
+                  : Number(fa.next_games_value?.composite_value ?? 0) < 0
+                    ? 'text-(--color-danger)'
+                    : 'text-(--color-text-muted)'}"
+              >
+                {fa.next_games_value
+                  ? Number(fa.next_games_value.composite_value).toFixed(2)
+                  : "-"}
+              </td>
+              <td
+                class="px-2 py-2.5 text-center font-mono text-xs text-(--color-text-muted) hidden sm:table-cell"
                 >{fa.player.primary_position}</td
               >
+              <td class="px-2 py-2.5 text-center hidden md:table-cell">
+                {#if fa.player.injury_status}
+                  <span class="badge badge-warning"
+                    >{fa.player.injury_status}</span
+                  >
+                {:else}
+                  <span class="badge badge-success">Available</span>
+                {/if}
+              </td>
               <td
                 class="px-2 py-2.5 text-center font-mono text-xs text-(--color-text-muted) hidden md:table-cell"
                 >{fa.player.team_abbr || "-"}</td
               >
+              <td
+                class="px-2 py-2.5 text-center font-mono text-xs font-bold hidden lg:table-cell {Number(
+                  fa.season_value?.composite_value ?? 0,
+                ) > 0
+                  ? 'text-(--color-success)'
+                  : Number(fa.season_value?.composite_value ?? 0) < 0
+                    ? 'text-(--color-danger)'
+                    : 'text-(--color-text-muted)'}"
+              >
+                {fa.season_value
+                  ? Number(fa.season_value.composite_value).toFixed(2)
+                  : "-"}
+              </td>
               <td
                 class="px-2 py-2.5 text-center font-mono text-xs text-(--color-text-muted) hidden xl:table-cell"
               >
@@ -419,19 +454,6 @@
                 {:else}
                   -
                 {/if}
-              </td>
-              <td
-                class="px-2 py-2.5 text-center font-mono text-xs font-bold {Number(
-                  fa.season_value?.composite_value ?? 0,
-                ) > 0
-                  ? 'text-(--color-success)'
-                  : Number(fa.season_value?.composite_value ?? 0) < 0
-                    ? 'text-(--color-danger)'
-                    : 'text-(--color-text-muted)'}"
-              >
-                {fa.season_value
-                  ? Number(fa.season_value.composite_value).toFixed(2)
-                  : "-"}
               </td>
               <td class="px-2 py-2.5 text-center hidden xl:table-cell">
                 {#if fa.season_value?.roster_percent !== null && fa.season_value?.roster_percent !== undefined}
@@ -460,28 +482,6 @@
                   <span class="font-mono text-xs text-(--color-text-muted)"
                     >-</span
                   >
-                {/if}
-              </td>
-              <td
-                class="px-2 py-2.5 text-center font-mono text-xs font-bold hidden sm:table-cell {Number(
-                  fa.next_games_value?.composite_value ?? 0,
-                ) > 0
-                  ? 'text-(--color-success)'
-                  : Number(fa.next_games_value?.composite_value ?? 0) < 0
-                    ? 'text-(--color-danger)'
-                    : 'text-(--color-text-muted)'}"
-              >
-                {fa.next_games_value
-                  ? Number(fa.next_games_value.composite_value).toFixed(2)
-                  : "-"}
-              </td>
-              <td class="px-2 py-2.5 text-center">
-                {#if fa.player.injury_status}
-                  <span class="badge badge-warning"
-                    >{fa.player.injury_status}</span
-                  >
-                {:else}
-                  <span class="badge badge-success">Available</span>
                 {/if}
               </td>
             </tr>
