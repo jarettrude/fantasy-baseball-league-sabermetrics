@@ -54,7 +54,7 @@ async def run_sync_league_meta():
     try:
         client = await _get_yahoo_client()
         league_key = _resolve_league_key()
-        meta = await client.get_league_meta(league_key)
+        meta = await client.get_league_meta(league_key, force_refresh=True)
         standings = await client.get_standings(league_key)
         await client.close()
 
@@ -186,6 +186,79 @@ async def run_sync_league_meta():
         raise
 
 
+_NEGATIVE_STAT_NAMES = {"ERA", "WHIP"}
+
+_DISPLAY_ONLY_STAT_NAMES = {"H/AB", "IP"}
+
+
+def _compute_category_results(
+    stat_categories: list[dict],
+    team_a_raw: dict[str, str],
+    team_b_raw: dict[str, str],
+) -> tuple[dict[str, str | float], dict[str, str | float], dict[str, str], int, int, int]:
+    """Compare per-category stats and compute wins/ties.
+
+    Yahoo stats arrive keyed by numeric stat_id strings. This function:
+      - Builds a stat_id → display_name map from league.stat_categories.
+      - Re-keys both stat dicts by display_name.
+      - Compares each category (lower-is-better for ERA/WHIP).
+      - Returns (team_a_named_stats, team_b_named_stats, category_results,
+                  team_a_wins, team_b_wins, ties).
+    """
+    id_to_name: dict[str, str] = {
+        str(cat["stat_id"]): cat["display_name"]
+        for cat in stat_categories
+        if cat.get("stat_id") is not None and cat.get("display_name")
+    }
+
+    def _rekey(raw: dict[str, str]) -> dict[str, str | float]:
+        result: dict[str, str | float] = {}
+        for sid, val in raw.items():
+            name = id_to_name.get(str(sid))
+            if name:
+                try:
+                    result[name] = float(val)
+                except (ValueError, TypeError):
+                    result[name] = val
+        return result
+
+    team_a_stats = _rekey(team_a_raw)
+    team_b_stats = _rekey(team_b_raw)
+
+    category_results: dict[str, str] = {}
+    team_a_wins = team_b_wins = ties = 0
+
+    logger.debug(
+        "All stat_categories from DB: %s",
+        [(c.get("stat_id"), c.get("display_name"), c.get("is_only_display_stat")) for c in stat_categories],
+    )
+
+    for cat in stat_categories:
+        if cat.get("is_only_display_stat"):
+            logger.debug("Skipping display-only (flag): %s", cat.get("display_name"))
+            continue
+        name = cat.get("display_name")
+        if not name or name in _DISPLAY_ONLY_STAT_NAMES:
+            logger.debug("Skipping display-only (name set): %s", name)
+            continue
+        a_val = team_a_stats.get(name)
+        b_val = team_b_stats.get(name)
+        if not isinstance(a_val, (int, float)) or not isinstance(b_val, (int, float)):
+            continue
+        lower_is_better = name in _NEGATIVE_STAT_NAMES
+        if a_val == b_val:
+            category_results[name] = "tie"
+            ties += 1
+        elif (a_val < b_val) == lower_is_better:
+            category_results[name] = "team_a"
+            team_a_wins += 1
+        else:
+            category_results[name] = "team_b"
+            team_b_wins += 1
+
+    return team_a_stats, team_b_stats, category_results, team_a_wins, team_b_wins, ties
+
+
 async def run_sync_matchups():
     """Sync matchups for all weeks (current + historical).
 
@@ -195,6 +268,8 @@ async def run_sync_matchups():
         (no need to re-fetch finalized weeks from Yahoo).
       - Always syncs the current week (live scores).
       - New weeks (no DB rows yet) are always fetched.
+      - Always recomputes category wins/ties so Yahoo retroactive corrections
+        are reflected in the DB and UI.
     """
     try:
         client = await _get_yahoo_client()
@@ -210,6 +285,7 @@ async def run_sync_matchups():
             current_week = league.current_week or 1
             start_week = league.start_week or 1
             weeks_synced = 0
+            weeks_to_invalidate: list[int] = []
 
             for week in range(start_week, current_week + 1):
                 if week < current_week:
@@ -230,6 +306,8 @@ async def run_sync_matchups():
                     logger.warning("Failed to fetch matchups for week %d: %s", week, e)
                     continue
 
+                stat_categories: list[dict] = league.stat_categories or []
+
                 for md in matchups_data:
                     team_a_result = await session.execute(select(Team).where(Team.yahoo_team_key == md.team_a_key))
                     team_a = team_a_result.scalar_one_or_none()
@@ -239,6 +317,15 @@ async def run_sync_matchups():
 
                     if not team_a or not team_b:
                         continue
+
+                    (
+                        team_a_stats,
+                        team_b_stats,
+                        category_results,
+                        team_a_wins,
+                        team_b_wins,
+                        matchup_ties,
+                    ) = _compute_category_results(stat_categories, md.team_a_stats, md.team_b_stats)
 
                     existing = await session.execute(
                         select(Matchup).where(
@@ -256,20 +343,30 @@ async def run_sync_matchups():
                             week=md.week,
                             team_a_id=team_a.id,
                             team_b_id=team_b.id,
-                            team_a_stats=md.team_a_stats,
-                            team_b_stats=md.team_b_stats,
+                            team_a_stats=team_a_stats,
+                            team_b_stats=team_b_stats,
+                            category_results=category_results,
+                            team_a_wins=team_a_wins,
+                            team_b_wins=team_b_wins,
+                            ties=matchup_ties,
                             is_complete=md.is_complete,
                         )
                         session.add(matchup)
                     else:
-                        matchup.team_a_stats = md.team_a_stats
-                        matchup.team_b_stats = md.team_b_stats
+                        matchup.team_a_stats = team_a_stats
+                        matchup.team_b_stats = team_b_stats
+                        matchup.category_results = category_results
+                        matchup.team_a_wins = team_a_wins
+                        matchup.team_b_wins = team_b_wins
+                        matchup.ties = matchup_ties
                         matchup.is_complete = md.is_complete
 
                 weeks_synced += 1
-                await invalidate_cache(f"league:matchups:{week}")
+                weeks_to_invalidate.append(week)
 
             await session.commit()
+            for w in weeks_to_invalidate:
+                await invalidate_cache(f"league:matchups:{w}")
             logger.info(
                 "Matchup sync complete: %d weeks synced (weeks %d-%d)",
                 weeks_synced,
