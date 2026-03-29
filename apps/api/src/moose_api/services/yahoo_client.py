@@ -166,8 +166,15 @@ class YahooClient:
                     token.refresh_token_encrypted = encrypt_token(self._refresh_token)
                     await session.commit()
 
-    async def get_league_meta(self, league_key: str) -> YahooLeagueMeta:
+    async def get_league_meta(self, league_key: str, force_refresh: bool = False) -> YahooLeagueMeta:
         url = f"{YAHOO_API_BASE}/league/{league_key}/settings"
+        if force_refresh:
+            import hashlib
+
+            from moose_api.core.redis import invalidate_cache
+
+            key_suffix = hashlib.md5(f"{url}None".encode()).hexdigest()
+            await invalidate_cache(f"yahoo:req:{key_suffix}")
         # League settings rarely change; cache for 24h
         raw = await self._request(url, cache_ttl=86400)
         root = ET.fromstring(raw)
@@ -188,6 +195,7 @@ class YahooClient:
                     "stat_id": int(_text(cat, "stat_id", "0")),
                     "display_name": _text(cat, "display_name"),
                     "position_type": _text(cat, "position_type"),
+                    "is_only_display_stat": _text(cat, "is_only_display_stat", "0") == "1",
                 }
             )
 
