@@ -7,7 +7,7 @@ plus AI-generated draft summary analysis.
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, Integer, Numeric, Text, func
+from sqlalchemy import ForeignKey, Integer, Numeric, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column
 
