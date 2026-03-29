@@ -68,6 +68,7 @@ class AISettingsResponse(BaseModel):
     league_recap_prompt: str
     manager_recap_prompt: str
     manager_briefing_prompt: str
+    draft_summary_prompt: str
     guardrails: str
 
 
@@ -80,6 +81,7 @@ class AISettingsUpdateRequest(BaseModel):
     league_recap_prompt: str | None = None
     manager_recap_prompt: str | None = None
     manager_briefing_prompt: str | None = None
+    draft_summary_prompt: str | None = None
     guardrails: str | None = None
 
 
@@ -129,3 +131,47 @@ class AdminBriefingResponse(BaseModel):
     content: str
     is_viewed: bool
     created_at: datetime
+
+
+class DraftPickResponse(BaseModel):
+    """Response model for an individual draft pick.
+
+    Contains pick order, round, player name, and team attribution.
+    """
+
+    pick_number: int
+    round_number: int
+    round_pick: int
+    player_name: str
+    player_position: str | None
+
+
+class TeamDraftResponse(BaseModel):
+    """Response model for a single team's draft picks.
+
+    Groups picks by team for structured display.
+    """
+
+    team_name: str
+    picks: list[DraftPickResponse]
+
+
+class DraftSummaryResponse(BaseModel):
+    """Response model for the AI-generated draft summary.
+
+    Contains the full generated narrative, generation metadata,
+    and the structured draft payload used to produce it.
+    """
+
+    id: int | None
+    season: int
+    status: str
+    content: str | None
+    model_used: str | None
+    provider_used: str | None
+    tokens_used: int | None
+    cost_usd: str | None
+    created_at: datetime | None
+    updated_at: datetime | None
+    teams_draft: list[TeamDraftResponse]
+    available_players: list[dict]

@@ -290,6 +290,18 @@ async def generate_briefings_force(ctx):
     await _track_job(ctx, "generate_briefings_force", lambda: run_generate_briefings(force=True))
 
 
+async def generate_draft_summary(ctx):
+    from moose_api.tasks.generate_draft_summary import run_generate_draft_summary
+
+    await _track_job(ctx, "generate_draft_summary", run_generate_draft_summary)
+
+
+async def generate_draft_summary_force(ctx):
+    from moose_api.tasks.generate_draft_summary import run_generate_draft_summary
+
+    await _track_job(ctx, "generate_draft_summary_force", lambda: run_generate_draft_summary(force=True))
+
+
 async def load_mlb_roster_data(ctx):
     from moose_api.tasks.load_mlb_roster import run_load_mlb_roster
 
@@ -438,6 +450,8 @@ class WorkerSettings:
         run_daily_sync_job,
         generate_briefings,
         generate_briefings_force,
+        generate_draft_summary,
+        generate_draft_summary_force,
     ]
 
     cron_jobs = [

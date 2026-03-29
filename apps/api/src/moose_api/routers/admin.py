@@ -14,6 +14,7 @@ from moose_api.core.database import get_db
 from moose_api.core.rate_limit import admin_sync_rate_limit, recap_rate_limit
 from moose_api.core.rendering import render_markdown
 from moose_api.core.security import require_commissioner
+from moose_api.models.draft import DraftPick, DraftSummary
 from moose_api.models.league import League
 from moose_api.models.manager_briefing import ManagerBriefing
 from moose_api.models.notification import CommissionerNotification
@@ -26,11 +27,14 @@ from moose_api.schemas.admin import (
     AdminOverviewResponse,
     AISettingsResponse,
     AISettingsUpdateRequest,
+    DraftPickResponse,
+    DraftSummaryResponse,
     JobStatusResponse,
     NotificationListResponse,
     NotificationResponse,
     SyncTriggerRequest,
     SyncTriggerResponse,
+    TeamDraftResponse,
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -62,6 +66,8 @@ VALID_JOBS = [
     "run_daily_sync_job",
     "generate_briefings",
     "generate_briefings_force",
+    "generate_draft_summary",
+    "generate_draft_summary_force",
 ]
 
 
@@ -407,6 +413,7 @@ async def get_ai_settings(
         league_recap_prompt=_read_prompt("league_recap.md"),
         manager_recap_prompt=_read_prompt("manager_recap.md"),
         manager_briefing_prompt=_read_prompt("morning_briefing.md"),
+        draft_summary_prompt=_read_prompt("draft_summary.md"),
         guardrails=_read_prompt("guardrails.md"),
     )
 
@@ -423,6 +430,8 @@ async def update_ai_settings(
         _write_prompt("manager_recap.md", req.manager_recap_prompt)
     if req.manager_briefing_prompt is not None:
         _write_prompt("morning_briefing.md", req.manager_briefing_prompt)
+    if req.draft_summary_prompt is not None:
+        _write_prompt("draft_summary.md", req.draft_summary_prompt)
     if req.guardrails is not None:
         _write_prompt("guardrails.md", req.guardrails)
 
@@ -723,6 +732,200 @@ async def get_ambiguous_mappings(
             }
         )
     return out
+
+
+@router.get("/draft-summary", response_model=DraftSummaryResponse)
+async def get_draft_summary(
+    current_user: dict = Depends(require_commissioner),
+    db: AsyncSession = Depends(get_db),
+):
+    """Retrieve the latest AI draft summary and raw draft pick data for the current season."""
+    league_result = await db.execute(select(League).limit(1))
+    league = league_result.scalar_one_or_none()
+    if not league:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No league found")
+
+    season = league.season or datetime.now(UTC).year
+
+    summary_result = await db.execute(
+        select(DraftSummary)
+        .where(DraftSummary.league_id == league.id)
+        .order_by(DraftSummary.created_at.desc())
+        .limit(1)
+    )
+    summary = summary_result.scalar_one_or_none()
+
+    picks_result = await db.execute(
+        select(DraftPick).where(DraftPick.league_id == league.id).order_by(DraftPick.pick_number.asc())
+    )
+    all_picks = picks_result.scalars().all()
+
+    teams_result = await db.execute(select(Team).where(Team.league_id == league.id))
+    teams = {t.id: t for t in teams_result.scalars().all()}
+
+    teams_by_name: dict[str, list[DraftPickResponse]] = {}
+    for pick in all_picks:
+        team = teams.get(pick.team_id)
+        team_name = team.name if team else f"Team {pick.team_id}"
+        if team_name not in teams_by_name:
+            teams_by_name[team_name] = []
+        teams_by_name[team_name].append(
+            DraftPickResponse(
+                pick_number=pick.pick_number,
+                round_number=pick.round_number,
+                round_pick=pick.round_pick,
+                player_name=pick.player_name,
+                player_position=pick.player_position,
+            )
+        )
+
+    teams_draft = [TeamDraftResponse(team_name=name, picks=picks) for name, picks in teams_by_name.items()]
+
+    available_players: list[dict] = []
+    if summary and summary.stat_payload:
+        available_players = summary.stat_payload.get("available_players", [])
+
+    return DraftSummaryResponse(
+        id=summary.id if summary else None,
+        season=season,
+        status=summary.status if summary else "none",
+        content=render_markdown(summary.content) if summary and summary.content else None,
+        model_used=summary.model_used if summary else None,
+        provider_used=summary.provider_used if summary else None,
+        tokens_used=summary.tokens_used if summary else None,
+        cost_usd=str(summary.cost_usd) if summary and summary.cost_usd else None,
+        created_at=summary.created_at if summary else None,
+        updated_at=summary.updated_at if summary else None,
+        teams_draft=teams_draft,
+        available_players=available_players,
+    )
+
+
+@router.post(
+    "/draft-summary/generate",
+    dependencies=[Depends(recap_rate_limit)],
+)
+async def generate_draft_summary(
+    force: bool = False,
+    current_user: dict = Depends(require_commissioner),
+):
+    """Trigger inline AI draft summary generation (not via background worker)."""
+    from moose_api.tasks.generate_draft_summary import run_generate_draft_summary
+
+    try:
+        await run_generate_draft_summary(force=force)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Draft summary generation failed: {e}",
+        ) from e
+
+    return {"status": "ok", "message": "Draft summary generated successfully"}
+
+
+@router.put("/draft-summary/{summary_id}")
+async def edit_draft_summary(
+    summary_id: int,
+    req: dict,
+    current_user: dict = Depends(require_commissioner),
+    db: AsyncSession = Depends(get_db),
+):
+    """Manually edit the content of a draft summary."""
+    result = await db.execute(select(DraftSummary).where(DraftSummary.id == summary_id))
+    summary = result.scalar_one_or_none()
+    if not summary:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Draft summary not found")
+
+    summary.content = req.get("content", summary.content)
+    await db.commit()
+    return {"status": "ok", "content": render_markdown(summary.content or "")}
+
+
+@router.post("/draft-picks/sync")
+async def sync_draft_picks_from_yahoo(
+    current_user: dict = Depends(require_commissioner),
+):
+    """Pull draft results and player data directly from Yahoo Fantasy Sports API.
+
+    Fetches the full /draftresults endpoint, resolves player/team references,
+    and persists DraftPick rows. Replaces any existing picks for this league.
+    """
+    from moose_api.tasks.sync_draft_data import run_sync_draft_data
+
+    try:
+        result = await run_sync_draft_data()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Draft sync failed: {e}",
+        ) from e
+
+    return result
+
+
+@router.post("/draft-picks/import")
+async def import_draft_picks(
+    req: dict,
+    current_user: dict = Depends(require_commissioner),
+    db: AsyncSession = Depends(get_db),
+):
+    """Import draft picks from a JSON payload.
+
+    Expects a list of pick objects with pick_number, round_number, round_pick,
+    team_yahoo_key or team_name, player_name, and optional player_position.
+    Clears any existing draft picks for the league before importing.
+    """
+    league_result = await db.execute(select(League).limit(1))
+    league = league_result.scalar_one_or_none()
+    if not league:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No league found")
+
+    picks_data: list[dict] = req.get("picks", [])
+    if not picks_data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No picks provided")
+
+    teams_result = await db.execute(select(Team).where(Team.league_id == league.id))
+    teams_by_name = {t.name.lower(): t for t in teams_result.scalars().all()}
+    teams_by_key = {t.yahoo_team_key: t for t in teams_by_name.values() if t.yahoo_team_key}
+
+    from sqlalchemy import delete
+
+    await db.execute(delete(DraftPick).where(DraftPick.league_id == league.id))
+
+    imported = 0
+    errors = []
+    for raw in picks_data:
+        team_name = raw.get("team_name", "")
+        team_key = raw.get("team_yahoo_key", "")
+        team = teams_by_key.get(team_key) or teams_by_name.get(team_name.lower())
+        if not team:
+            errors.append(f"Pick #{raw.get('pick_number')}: team '{team_name}' not found")
+            continue
+
+        player_key = raw.get("yahoo_player_key")
+        player_id = None
+        if player_key:
+            p_result = await db.execute(select(Player).where(Player.yahoo_player_key == player_key))
+            p = p_result.scalar_one_or_none()
+            if p:
+                player_id = p.id
+
+        pick = DraftPick(
+            league_id=league.id,
+            team_id=team.id,
+            player_id=player_id,
+            pick_number=raw["pick_number"],
+            round_number=raw["round_number"],
+            round_pick=raw["round_pick"],
+            player_name=raw["player_name"],
+            player_position=raw.get("player_position"),
+            yahoo_player_key=player_key,
+        )
+        db.add(pick)
+        imported += 1
+
+    await db.commit()
+    return {"imported": imported, "errors": errors}
 
 
 @router.post("/mappings/confirm-all")

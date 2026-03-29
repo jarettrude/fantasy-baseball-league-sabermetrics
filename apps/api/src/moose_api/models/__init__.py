@@ -1,5 +1,6 @@
 from moose_api.models.ai_usage import AIUsageLog
 from moose_api.models.base import Base
+from moose_api.models.draft import DraftPick, DraftSummary
 from moose_api.models.free_agent import FreeAgentSnapshot
 from moose_api.models.league import League
 from moose_api.models.manager_briefing import ManagerBriefing
@@ -33,4 +34,6 @@ __all__ = [
     "YahooToken",
     "SessionLog",
     "ManagerBriefing",
+    "DraftPick",
+    "DraftSummary",
 ]
