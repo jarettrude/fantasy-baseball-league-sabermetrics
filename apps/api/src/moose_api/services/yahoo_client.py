@@ -173,7 +173,7 @@ class YahooClient:
 
             from moose_api.core.redis import invalidate_cache
 
-            key_suffix = hashlib.md5(f"{url}None".encode()).hexdigest()
+            key_suffix = hashlib.md5(f"{url}{None}".encode()).hexdigest()
             await invalidate_cache(f"yahoo:req:{key_suffix}")
         # League settings rarely change; cache for 24h
         raw = await self._request(url, cache_ttl=86400)
