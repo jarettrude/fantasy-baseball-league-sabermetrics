@@ -14,6 +14,7 @@
     league_recap_prompt: string;
     manager_recap_prompt: string;
     manager_briefing_prompt: string;
+    draft_summary_prompt: string;
     guardrails: string;
   }
 
@@ -50,6 +51,7 @@
         league_recap_prompt: aiSettings.league_recap_prompt,
         manager_recap_prompt: aiSettings.manager_recap_prompt,
         manager_briefing_prompt: aiSettings.manager_briefing_prompt,
+        draft_summary_prompt: aiSettings.draft_summary_prompt,
         guardrails: aiSettings.guardrails,
       });
       saveSuccess = true;

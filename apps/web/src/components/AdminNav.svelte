@@ -21,6 +21,11 @@
       label: "AI Briefings",
       match: "/admin/briefings",
     },
+    {
+      href: "/admin/draft-summary",
+      label: "Draft Summary",
+      match: "/admin/draft-summary",
+    },
   ];
 </script>
 

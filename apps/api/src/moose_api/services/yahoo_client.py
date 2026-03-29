@@ -439,6 +439,52 @@ class YahooClient:
 
         return players
 
+    async def get_draft_picks(self, league_key: str) -> list[dict]:
+        """Fetch all draft picks for a league in order from Yahoo.
+
+        Returns a list of dicts with keys: pick, round, team_key, player_key, player_name, position.
+
+        Args:
+            league_key: Yahoo league key (e.g. "mlb.l.12345")
+
+        Returns:
+            List of draft pick dicts sorted by pick number
+        """
+        url = f"{YAHOO_API_BASE}/league/{league_key}/draftresults"
+        raw = await self._request(url)
+        root = ET.fromstring(raw)
+        ns = {"y": "http://fantasysports.yahooapis.com/fantasy/v2/base.rng"}
+
+        def _pick_text(el, tag, default=""):
+            child = el.find(f"y:{tag}", ns)
+            return child.text if child is not None and child.text else default
+
+        picks = []
+        for pick_el in root.findall(".//y:draft_result", ns):
+            pick_num_raw = _pick_text(pick_el, "pick")
+            round_raw = _pick_text(pick_el, "round")
+            if not pick_num_raw:
+                continue
+
+            pick_num = int(pick_num_raw)
+            round_num = int(round_raw) if round_raw else 0
+
+            # Yahoo provides a cost field in auction drafts; snake draft has pick_cost=""
+            team_key = _pick_text(pick_el, "team_key")
+            player_key = _pick_text(pick_el, "player_key")
+
+            picks.append(
+                {
+                    "pick_number": pick_num,
+                    "round_number": round_num,
+                    "team_key": team_key,
+                    "player_key": player_key,
+                }
+            )
+
+        picks.sort(key=lambda p: p["pick_number"])
+        return picks
+
     async def get_player_roster_percents(self, league_key: str, player_keys: list[str]) -> dict[str, float]:
         """Fetch percent_owned statistics for a batch of players (max 25)."""
         if not player_keys:

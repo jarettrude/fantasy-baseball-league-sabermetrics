@@ -1,0 +1,12 @@
+---
+import AppLayout from "../../layouts/AppLayout.astro";
+import AdminDraftSummaryView from "../../components/AdminDraftSummaryView.svelte";
+import AdminNav from "../../components/AdminNav.svelte";
+---
+
+<AppLayout title="Admin Draft Summary" noindex={true}>
+  <div class="space-y-6">
+    <AdminNav currentPath="/admin/draft-summary" />
+    <AdminDraftSummaryView client:load />
+  </div>
+</AppLayout>
