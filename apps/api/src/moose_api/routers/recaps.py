@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from moose_api.core.database import get_db
@@ -66,17 +66,26 @@ async def get_week_recaps(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Retrieves all published recaps for a specified week across the league."""
+    """Retrieves published recaps for a specified week - league recap + user's own recap."""
     league_result = await db.execute(select(League).limit(1))
     league = league_result.scalar_one_or_none()
     if not league:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="League not found")
+
+    team_result = await db.execute(select(Team).where(Team.manager_user_id == current_user["id"]))
+    user_team = team_result.scalar_one_or_none()
+
+    if user_team:
+        type_filter = or_(Recap.type == "league", (Recap.type == "manager") & (Recap.team_id == user_team.id))
+    else:
+        type_filter = Recap.type == "league"
 
     result = await db.execute(
         select(Recap).where(
             Recap.league_id == league.id,
             Recap.week == week,
             Recap.status == "published",
+            type_filter,
         )
     )
     recaps = result.scalars().all()
@@ -136,4 +145,5 @@ async def edit_recap(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recap not found")
 
     recap.content = req.content
+    await db.commit()
     return await _recap_to_response(recap, db)

@@ -665,18 +665,186 @@ async def regenerate_recap(
     current_user: dict = Depends(require_commissioner),
     db: AsyncSession = Depends(get_db),
 ):
-    """Regenerate a specific recap using its stored stat_payload."""
+    """Regenerate a specific recap using fresh data from the database."""
     from moose_api.ai.cost_tracker import estimate_cost, log_usage
     from moose_api.ai.llm_router import LLMError, generate_text, reset_batch_quota_state
     from moose_api.ai.prompt_loader import build_recap_prompt
+    from moose_api.models.matchup import Matchup
+    from moose_api.models.roster import RosterSlot
+    from moose_api.models.player import Player
 
     result = await db.execute(select(Recap).where(Recap.id == recap_id))
     recap = result.scalar_one_or_none()
     if not recap:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recap not found")
 
+    # Fetch fresh league data for this recap's week
+    league_result = await db.execute(select(League).where(League.id == recap.league_id))
+    league = league_result.scalar_one_or_none()
+    if not league:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="League not found")
+
+    # Fetch fresh matchup data for the recap week (for the recap content)
+    matchups_result = await db.execute(
+        select(Matchup).where(
+            Matchup.league_id == league.id,
+            Matchup.week == recap.week,
+        )
+    )
+    matchups = matchups_result.scalars().all()
+
+    # Fetch teams
+    teams_result = await db.execute(select(Team).where(Team.league_id == league.id))
+    teams = {t.id: t for t in teams_result.scalars().all()}
+
+    # Build fresh matchup data
+    base_matchup_data = []
+    for m in matchups:
+        team_a = teams.get(m.team_a_id)
+        team_b = teams.get(m.team_b_id)
+        base_matchup_data.append(
+            {
+                "team_a": team_a.name if team_a else "Unknown",
+                "team_b": team_b.name if team_b else "Unknown",
+                "team_a_stats": m.team_a_stats or {},
+                "team_b_stats": m.team_b_stats or {},
+                "category_results": m.category_results or {},
+                "team_a_wins": m.team_a_wins,
+                "team_b_wins": m.team_b_wins,
+                "ties": m.ties,
+            }
+        )
+
+    # Calculate historical standings up to and including the recap week
+    # Fetch all matchups from week 1 through recap.week
+    historical_matchups_result = await db.execute(
+        select(Matchup).where(
+            Matchup.league_id == league.id,
+            Matchup.week <= recap.week,
+            Matchup.is_complete.is_(True),
+        )
+    )
+    historical_matchups = historical_matchups_result.scalars().all()
+
+    # Calculate cumulative records for each team up to this week
+    team_records = {team_id: {"wins": 0, "losses": 0, "ties": 0} for team_id in teams.keys()}
+    for m in historical_matchups:
+        # Determine winner of this matchup based on category wins
+        if m.team_a_wins > m.team_b_wins:
+            # Team A won
+            if m.team_a_id in team_records:
+                team_records[m.team_a_id]["wins"] += 1
+            if m.team_b_id in team_records:
+                team_records[m.team_b_id]["losses"] += 1
+        elif m.team_b_wins > m.team_a_wins:
+            # Team B won
+            if m.team_b_id in team_records:
+                team_records[m.team_b_id]["wins"] += 1
+            if m.team_a_id in team_records:
+                team_records[m.team_a_id]["losses"] += 1
+        else:
+            # Tie
+            if m.team_a_id in team_records:
+                team_records[m.team_a_id]["ties"] += 1
+            if m.team_b_id in team_records:
+                team_records[m.team_b_id]["ties"] += 1
+
+    # Sort teams by wins (descending), ties (descending), losses (ascending) for standings
+    sorted_teams = sorted(
+        teams.values(),
+        key=lambda t: (-team_records[t.id]["wins"], -team_records[t.id]["ties"], team_records[t.id]["losses"]),
+    )
+
+    standings_data = []
+    for rank, team in enumerate(sorted_teams, 1):
+        record = team_records[team.id]
+        # Add standing to team_records for manager recap lookup
+        team_records[team.id]["standing"] = rank
+        standings_data.append(
+            {
+                "team": team.name,
+                "wins": record["wins"],
+                "losses": record["losses"],
+                "ties": record["ties"],
+                "standing": rank,
+            }
+        )
+
+    # Build fresh stat payload based on recap type
+    if recap.type == "league":
+        stat_payload = {
+            "season_week_being_recapped": recap.week,
+            "matchups": base_matchup_data,
+            "standings": standings_data,
+        }
+    else:
+        # Manager recap - need team-specific data
+        team = teams.get(recap.team_id) if recap.team_id else None
+        if not team:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found for manager recap")
+
+        # Find team's matchup
+        team_matchup = next(
+            (m for m in matchups if m.team_a_id == team.id or m.team_b_id == team.id),
+            None,
+        )
+
+        # Fetch roster for that week
+        roster_result = await db.execute(
+            select(RosterSlot).where(
+                RosterSlot.team_id == team.id,
+                RosterSlot.season == league.season,
+                RosterSlot.week == recap.week,
+                RosterSlot.is_active.is_(True),
+            )
+        )
+        roster_slots = roster_result.scalars().all()
+
+        roster_names = []
+        for slot in roster_slots:
+            player_result = await db.execute(select(Player).where(Player.id == slot.player_id))
+            player = player_result.scalar_one_or_none()
+            if player:
+                roster_names.append(
+                    {
+                        "name": player.name,
+                        "position": slot.position,
+                        "injury_status": player.injury_status,
+                    }
+                )
+
+        # Build matchup detail
+        matchup_detail = None
+        if team_matchup:
+            is_team_a = team_matchup.team_a_id == team.id
+            opp_id = team_matchup.team_b_id if is_team_a else team_matchup.team_a_id
+            opp = teams.get(opp_id)
+            matchup_detail = {
+                "opponent": opp.name if opp else "Unknown",
+                "my_stats": team_matchup.team_a_stats if is_team_a else team_matchup.team_b_stats,
+                "opp_stats": team_matchup.team_b_stats if is_team_a else team_matchup.team_a_stats,
+                "category_results": team_matchup.category_results or {},
+                "my_wins": team_matchup.team_a_wins if is_team_a else team_matchup.team_b_wins,
+                "opp_wins": team_matchup.team_b_wins if is_team_a else team_matchup.team_a_wins,
+                "ties": team_matchup.ties,
+                "is_complete": team_matchup.is_complete,
+            }
+
+        stat_payload = {
+            "season_week_being_recapped": recap.week,
+            "manager_team": team.name,
+            "standing": team_records[team.id]["standing"],
+            "record": team_records[team.id],
+            "matchup": matchup_detail,
+            "roster": roster_names,
+            "league_standings": standings_data,
+        }
+
+    # Also update the stored stat_payload so future regenerations work
+    recap.stat_payload = stat_payload
+
     template = "league_recap.md" if recap.type == "league" else "manager_recap.md"
-    system_prompt, user_prompt = build_recap_prompt(template, recap.stat_payload or {})
+    system_prompt, user_prompt = build_recap_prompt(template, stat_payload)
 
     try:
         reset_batch_quota_state()
@@ -699,7 +867,6 @@ async def regenerate_recap(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"LLM generation failed: {e}",
         ) from e
-    return recap
 
 
 @router.get("/mappings")
