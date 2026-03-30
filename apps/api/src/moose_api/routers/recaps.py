@@ -76,7 +76,7 @@ async def get_week_recaps(
     user_team = team_result.scalar_one_or_none()
 
     if user_team:
-        type_filter = or_(Recap.type == "league", (Recap.type == "manager") & (Recap.team_id == user_team.id))
+        type_filter = or_(Recap.type == "league", and_(Recap.type == "manager", Recap.team_id == user_team.id))
     else:
         type_filter = Recap.type == "league"
 
