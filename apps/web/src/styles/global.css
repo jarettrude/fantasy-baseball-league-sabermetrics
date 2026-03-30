@@ -240,6 +240,15 @@ body {
 @keyframes fade-in {
   from {
     opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modal-slide-up {
+  from {
+    opacity: 0;
     transform: translateY(8px);
   }
   to {
@@ -847,6 +856,10 @@ select.input {
   justify-content: center;
   padding: var(--spacing-page);
   animation: fade-in 0.2s ease;
+}
+
+.overlay > .card {
+  animation: modal-slide-up 0.2s ease;
 }
 
 /* ================================================================== */
