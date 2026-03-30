@@ -121,7 +121,7 @@
 
   function startEdit(briefing: Briefing) {
     editingBriefing = briefing;
-    editContent = briefing.content;
+    editContent = briefing.content ?? '';
   }
 
   function cancelEdit() {
@@ -218,31 +218,7 @@
             </div>
 
             <div class="p-4">
-              {#if editingBriefing?.id === b.id}
-                <div class="space-y-3">
-                  <textarea
-                    bind:value={editContent}
-                    class="input w-full font-mono text-xs"
-                    placeholder="Briefing content..."
-                  ></textarea>
-                  <div class="flex gap-2 justify-end">
-                    <button
-                      onclick={saveEdit}
-                      disabled={saving}
-                      class="btn btn-primary text-xs"
-                    >
-                      {saving ? "SAVING..." : "SAVE"}
-                    </button>
-                    <button
-                      onclick={cancelEdit}
-                      disabled={saving}
-                      class="btn btn-secondary text-xs"
-                    >
-                      CANCEL
-                    </button>
-                  </div>
-                </div>
-              {:else if b.content}
+              {#if b.content}
                 <div class="relative">
                   <div class="hidden"></div>
                   <div class="prose prose-sm min-w-0">
@@ -305,3 +281,52 @@
     </div>
   </aside>
 </div>
+
+{#if editingBriefing}
+  <div
+    class="overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="edit-briefing-title"
+    tabindex="-1"
+    onkeydown={(e) => e.key === "Escape" && cancelEdit()}
+  >
+    <div
+      class="card w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden"
+    >
+      <div
+        class="flex items-center justify-between p-4 border-b border-(--color-border)"
+      >
+        <h2
+          id="edit-briefing-title"
+          class="font-mono text-sm font-bold tracking-widest uppercase text-(--color-text)"
+        >
+          // BRIEFING EDITOR: {editingBriefing.team_name} //
+        </h2>
+        <button onclick={cancelEdit} class="btn btn-secondary text-xs">
+          [X] CLOSE
+        </button>
+      </div>
+      <div class="p-4 flex-1 overflow-y-auto space-y-4">
+        <div class="font-mono text-[0.6rem] text-(--color-text-muted)">
+          MD FORMAT REQUIRED. SYSTEM ACCEPTS STANDARD MARKDOWN TOKENS.
+        </div>
+        <textarea
+          bind:value={editContent}
+          rows="18"
+          class="input w-full font-mono text-xs"
+          aria-label="Briefing markdown content"
+          spellcheck="false"
+        ></textarea>
+        <div class="flex justify-end gap-2">
+          <button onclick={cancelEdit} class="btn btn-secondary">
+            ABORT
+          </button>
+          <button onclick={saveEdit} disabled={saving} class="btn btn-primary">
+            {saving ? "COMMITTING..." : "COMMIT OVERRIDE"}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
