@@ -125,6 +125,7 @@ async def run_load_live_season_stats():
 
     Uses concurrent fetching with rate limiting for efficiency.
     """
+    mlb_client = None
     try:
         mlb_client = MLBClient()
         season = date.today().year
@@ -218,4 +219,5 @@ async def run_load_live_season_stats():
             await session.commit()
         raise
     finally:
-        await mlb_client.close()
+        if mlb_client:
+            await mlb_client.close()
