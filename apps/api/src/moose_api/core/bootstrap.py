@@ -11,6 +11,9 @@ from collections.abc import Iterable
 from datetime import UTC, datetime
 from importlib import import_module
 
+from sqlalchemy import select
+
+from moose_api.core.config import settings
 from moose_api.core.redis import get_redis
 
 logger = logging.getLogger(__name__)
@@ -51,8 +54,38 @@ async def is_bootstrap_ready() -> bool:
 
 
 async def ensure_commissioner_bootstrap_ready(job_name: str) -> bool:
-    """Return True when commissioner OAuth bootstrap is complete, else log/skip."""
+    """Return True when commissioner OAuth bootstrap is complete, else log/skip.
+
+    Checks Redis flag first, falls back to database check if Redis was flushed.
+    """
     ready = await is_bootstrap_ready()
+
+    # If Redis flag is missing, check database as fallback (handles Redis flush)
+    if not ready:
+        try:
+            from moose_api.core.database import async_session_factory
+            from moose_api.models.user import User
+            from moose_api.models.yahoo_token import YahooToken
+
+            async with async_session_factory() as session:
+                commissioner_result = await session.execute(
+                    select(User).where(User.yahoo_guid == settings.commissioner_yahoo_guid)
+                )
+                commissioner = commissioner_result.scalar_one_or_none()
+
+                if commissioner:
+                    token_result = await session.execute(
+                        select(YahooToken).where(YahooToken.user_id == commissioner.id)
+                    )
+                    token = token_result.scalar_one_or_none()
+                    if token:
+                        # Commissioner exists in DB with valid token - restore Redis flag
+                        await mark_bootstrap_ready()
+                        logger.info("Redis bootstrap flag missing but commissioner exists in DB. Restoring flag.")
+                        ready = True
+        except Exception as e:
+            logger.warning("Database fallback check for bootstrap failed: %s", e)
+
     if not ready:
         logger.info(
             "Job %s deferred until commissioner completes OAuth bootstrap.",
