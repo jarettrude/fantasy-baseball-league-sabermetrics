@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 
 MLB_API_BASE = "https://statsapi.mlb.com/api/v1"
 
-# Adaptive throttling knobs (overridable via env vars for local tuning)
 MLB_API_MIN_SLEEP_SECONDS = float(os.getenv("MLB_API_MIN_SLEEP_SECONDS", "0.75"))
 MLB_API_JITTER_SECONDS = float(os.getenv("MLB_API_JITTER_SECONDS", "0.35"))
 MLB_API_RATE_LIMIT_COOLDOWN = float(os.getenv("MLB_API_RATE_LIMIT_COOLDOWN", "2.5"))
@@ -71,6 +70,23 @@ class MLBClient:
 
     async def close(self):
         await self._client.aclose()
+
+    async def get_player_stats(self, player_id: int, season: int, group: str = "hitting") -> dict | None:
+        """Get player stats from MLB Stats API.
+
+        Args:
+            player_id: MLB player ID
+            season: Season year
+            group: Stat group (hitting or pitching)
+
+        Returns:
+            Stats dict or None if unavailable
+        """
+        return await self._request(
+            f"people/{player_id}/stats",
+            params={"stats": "season", "season": season, "group": group},
+            cache_ttl=3600,
+        )
 
     @retry(
         stop=stop_after_attempt(3),

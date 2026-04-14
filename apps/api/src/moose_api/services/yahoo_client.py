@@ -325,15 +325,12 @@ class YahooClient:
         base_url = f"{YAHOO_API_BASE}/team/{team_key}/roster"
         modifiers: list[str] = []
 
-        # Yahoo rejects ;out=ranks when a week projection is requested (preseason weeks in particular).
-        if week is None:
-            modifiers.append("out=ranks")
+        modifiers.append("out=ranks")
         if week:
             modifiers.append(f"week={week}")
 
         url = base_url if not modifiers else f"{base_url};" + ";".join(modifiers)
 
-        # Rosters can change with daily transactions; cache for 2 hours
         raw = await self._request(url, cache_ttl=7200)
         root = ET.fromstring(raw)
         ns = {"y": "http://fantasysports.yahooapis.com/fantasy/v2/base.rng"}

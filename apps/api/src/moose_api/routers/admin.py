@@ -59,8 +59,7 @@ VALID_JOBS = [
     "purge_free_agent_snapshots",
     "load_mlb_roster_data",
     "resolve_player_mappings",
-    "load_fangraphs_stats",
-    "load_fangraphs_ros",
+    "load_live_season_stats",
     "run_preseason_setup_job",
     "run_force_preseason_setup_job",
     "run_daily_sync_job",
@@ -678,13 +677,11 @@ async def regenerate_recap(
     if not recap:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recap not found")
 
-    # Fetch fresh league data for this recap's week
     league_result = await db.execute(select(League).where(League.id == recap.league_id))
     league = league_result.scalar_one_or_none()
     if not league:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="League not found")
 
-    # Fetch fresh matchup data for the recap week (for the recap content)
     matchups_result = await db.execute(
         select(Matchup).where(
             Matchup.league_id == league.id,
@@ -693,11 +690,9 @@ async def regenerate_recap(
     )
     matchups = matchups_result.scalars().all()
 
-    # Fetch teams
     teams_result = await db.execute(select(Team).where(Team.league_id == league.id))
     teams = {t.id: t for t in teams_result.scalars().all()}
 
-    # Build fresh matchup data
     base_matchup_data = []
     for m in matchups:
         team_a = teams.get(m.team_a_id)
@@ -715,62 +710,54 @@ async def regenerate_recap(
             }
         )
 
-    # Calculate historical standings up to and including the recap week
-    # Fetch all matchups from week 1 through recap.week
     historical_matchups_result = await db.execute(
         select(Matchup).where(
             Matchup.league_id == league.id,
             Matchup.week <= recap.week,
-            Matchup.is_complete.is_(True),
         )
     )
     historical_matchups = historical_matchups_result.scalars().all()
 
-    # Calculate cumulative records for each team up to this week
     team_records = {team_id: {"wins": 0, "losses": 0, "ties": 0} for team_id in teams.keys()}
     for m in historical_matchups:
-        # Determine winner of this matchup based on category wins
         if m.team_a_wins > m.team_b_wins:
-            # Team A won
             if m.team_a_id in team_records:
                 team_records[m.team_a_id]["wins"] += 1
             if m.team_b_id in team_records:
                 team_records[m.team_b_id]["losses"] += 1
         elif m.team_b_wins > m.team_a_wins:
-            # Team B won
             if m.team_b_id in team_records:
                 team_records[m.team_b_id]["wins"] += 1
             if m.team_a_id in team_records:
                 team_records[m.team_a_id]["losses"] += 1
         else:
-            # Tie
             if m.team_a_id in team_records:
                 team_records[m.team_a_id]["ties"] += 1
             if m.team_b_id in team_records:
                 team_records[m.team_b_id]["ties"] += 1
 
-    # Sort teams by wins (descending), ties (descending), losses (ascending) for standings
     sorted_teams = sorted(
         teams.values(),
-        key=lambda t: (-team_records[t.id]["wins"], -team_records[t.id]["ties"], team_records[t.id]["losses"]),
+        key=lambda t: (
+            -team_records[t.id]["wins"],
+            team_records[t.id]["losses"],
+            -team_records[t.id]["ties"],
+        ),
     )
-
     standings_data = []
     for rank, team in enumerate(sorted_teams, 1):
         record = team_records[team.id]
-        # Add standing to team_records for manager recap lookup
         team_records[team.id]["standing"] = rank
         standings_data.append(
             {
-                "team": team.name,
+                "team_id": team.id,
+                "team_name": team.name,
+                "standing": rank,
                 "wins": record["wins"],
                 "losses": record["losses"],
                 "ties": record["ties"],
-                "standing": rank,
             }
         )
-
-    # Build fresh stat payload based on recap type
     if recap.type == "league":
         stat_payload = {
             "season_week_being_recapped": recap.week,

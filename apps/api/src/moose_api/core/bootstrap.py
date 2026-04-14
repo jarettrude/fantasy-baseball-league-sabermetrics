@@ -34,7 +34,6 @@ BOOTSTRAP_GUARDED_JOBS: tuple[str, ...] = (
     "generate_weekly_recaps",
     "generate_briefings",
     "generate_briefings_force",
-    "load_fangraphs_ros",
     "run_preseason_setup_job",
     "run_force_preseason_setup_job",
     "run_daily_sync_job",

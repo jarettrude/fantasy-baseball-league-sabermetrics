@@ -69,7 +69,24 @@ async def run_sync_roster_trends():
                     if p.yahoo_player_key in percents:
                         current_pct = percents[p.yahoo_player_key]
                         snap = today_snaps.get(p.id)
-                        if snap:
+
+                        if not snap:
+                            snap = PlayerValueSnapshot(
+                                player_id=p.id,
+                                snapshot_date=today,
+                                type="season",
+                                category_scores={},
+                                composite_value=0.0,
+                                yahoo_rank=p.yahoo_rank,
+                                our_rank=None,
+                                injury_weight=1.0,
+                                roster_percent=current_pct,
+                                roster_trend=0.0,
+                            )
+                            session.add(snap)
+                            today_snaps[p.id] = snap
+                            updates_count += 1
+                        else:
                             snap.roster_percent = current_pct
 
                             past_snap = past_snaps.get(p.id)
@@ -80,9 +97,6 @@ async def run_sync_roster_trends():
 
                             updates_count += 1
 
-                # Very important to respect Yahoo rate limits
-                # Yahoo allows ~10,000 requests/day, but too many concurrent bursts
-                # will cause 429 Too Many Requests
                 await asyncio.sleep(0.5)
 
             await session.commit()

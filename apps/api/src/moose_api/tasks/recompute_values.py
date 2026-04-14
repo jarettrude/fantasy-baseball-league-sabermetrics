@@ -16,7 +16,7 @@ from moose_api.core.database import async_session_factory
 from moose_api.models.league import League
 from moose_api.models.notification import CommissionerNotification
 from moose_api.models.player import Player
-from moose_api.models.stats import PlayerValueSnapshot, ProjectionBaseline, StatLine
+from moose_api.models.stats import PlayerValueSnapshot, StatLine
 from moose_api.services.gambling_service import GamblingService
 from moose_api.services.valuation_engine import (
     ComputeZScoresRequest,
@@ -49,68 +49,6 @@ def _stat_field_for_category(display_name: str) -> str | None:
         "BB": "walks",
     }
     return mapping.get(display_name.upper())
-
-
-# Map Yahoo stat category display names to FanGraphs projected_stats keys.
-# FanGraphs uses 'SO' for strikeouts while Yahoo uses 'K'.
-PROJECTION_KEY_MAP = {
-    "R": "R",
-    "HR": "HR",
-    "RBI": "RBI",
-    "SB": "SB",
-    "AVG": "AVG",
-    "H": "H",
-    "AB": "AB",
-    "H/AB": "AVG",
-    "W": "W",
-    "SV": "SV",
-    "K": "SO",
-    "SO": "SO",
-    "ERA": "ERA",
-    "WHIP": "WHIP",
-    "IP": "IP",
-    "ER": "ER",
-    "BB": "BB",
-}
-
-
-async def _load_projection_stats(
-    session, player_ids: list[int], categories: list[StatCategory]
-) -> dict[int, dict[str, float]]:
-    """Load preseason projection stats from projection_baseline table.
-
-    Returns a dict mapping player_id -> {category_display_name: value}.
-    Only includes players who have projection baselines.
-    """
-    result = await session.execute(
-        select(ProjectionBaseline)
-        .where(ProjectionBaseline.player_id.in_(player_ids))
-        .order_by(ProjectionBaseline.updated_at.desc())
-    )
-    baselines = result.scalars().all()
-
-    # Keep only the most recent baseline per player
-    latest: dict[int, ProjectionBaseline] = {}
-    for pb in baselines:
-        if pb.player_id not in latest:
-            latest[pb.player_id] = pb
-
-    stats_by_player: dict[int, dict[str, float]] = {}
-    for player_id, pb in latest.items():
-        projected = pb.projected_stats or {}
-        player_stats: dict[str, float] = {}
-
-        for cat in categories:
-            fg_key = PROJECTION_KEY_MAP.get(cat.display_name.upper())
-            if fg_key and fg_key in projected:
-                val = projected[fg_key]
-                if val is not None:
-                    player_stats[cat.display_name] = float(val)
-
-        if player_stats:
-            stats_by_player[player_id] = player_stats
-
-    return stats_by_player
 
 
 async def _load_statline_stats(
@@ -149,7 +87,6 @@ async def _load_statline_stats(
             if row.total is not None:
                 sum_queries[row.player_id][display_name] = float(row.total)
 
-    # Calculate ratio stats from components
     avg_result = await session.execute(
         select(
             StatLine.player_id,
@@ -245,79 +182,58 @@ async def run_recompute_values(snapshot_type: str = "season"):
             player_ids = [p.id for p in all_players]
             player_map = {p.id: p for p in all_players}
 
-            # Try in-season stat_line data first
             statline_stats = await _load_statline_stats(session, player_ids, categories)
             has_season_data = any(any(v != 0 for v in stats.values()) for stats in statline_stats.values())
 
-            # Load projection baselines as fallback/supplement
-            projection_stats = await _load_projection_stats(session, player_ids, categories)
-
-            # Merge: in-season data takes priority, projections fill gaps
             merged_stats: dict[int, dict[str, float]] = {}
             data_sources: dict[int, list[str]] = {}
 
             for pid in player_ids:
                 sl = statline_stats.get(pid, {})
-                proj = projection_stats.get(pid, {})
 
                 if has_season_data and sl and any(v != 0 for v in sl.values()):
-                    # Player has real in-season data — use it
                     merged_stats[pid] = sl
-                    sources = ["yahoo_stats"]
-                    if proj:
-                        sources.append("fangraphs")
-                    data_sources[pid] = sources
-                elif proj:
-                    # No in-season data — fall back to projections
-                    merged_stats[pid] = proj
-                    data_sources[pid] = ["fangraphs"]
+                    data_sources[pid] = ["mlb_api"]
                 else:
-                    # No data at all
                     merged_stats[pid] = {}
                     data_sources[pid] = []
 
-            # Streamer overrides for Next 7 Days
             mlb_starts = {}
             win_probs = {}
             if snapshot_type == "next_games":
                 mlb_starts = await _fetch_mlb_starts(days=7)
 
-                # Phase 2: Gambling Vegas Odds
                 try:
                     gambling = GamblingService()
                     win_probs = await gambling.get_team_win_probabilities()
-                    await gambling.close()
                 except Exception as e:
                     logger.warning("Failed to fetch gambling odds: %s", e)
 
-            # Build PlayerStatSummary for each player
             player_summaries = []
             for player_id, player in player_map.items():
                 player_stats = merged_stats.get(player_id, {})
-
                 multiplier = 1.0
-                if snapshot_type == "next_games" and player.is_pitcher:
-                    starts = mlb_starts.get(player.mlb_id, 0) if player.mlb_id else 0
-                    if player.primary_position == "SP" or "SP" in player.eligible_positions:
-                        if starts >= 2:
-                            multiplier = 1.8  # Huge boost for 2-start pitchers
-                        elif starts == 1:
-                            multiplier = 1.0  # Normal 1-start pitcher
-                        else:
-                            # 0 starts for a SP means they probably aren't playing much this week
-                            multiplier = 0.2 if player.primary_position == "SP" else 1.0
-                    else:
-                        # Pure Reliever (RP) – normal multiplier
-                        multiplier = 1.0
-
-                # Matchup adjustments (Gambling API)
                 matchup_multiplier = 1.0
-                if snapshot_type == "next_games" and player.team_abbr in win_probs:
-                    prob = win_probs[player.team_abbr]
-                    if prob >= 0.65:
-                        matchup_multiplier = 1.15
-                    elif prob <= 0.35:
-                        matchup_multiplier = 0.85
+
+                if player_stats:
+                    if snapshot_type == "next_games":
+                        starts = mlb_starts.get(player.mlb_id, 0) if player.mlb_id else 0
+                        if player.primary_position == "SP" or "SP" in player.eligible_positions:
+                            if starts >= 2:
+                                multiplier = 1.8
+                            elif starts == 1:
+                                multiplier = 1.0
+                            else:
+                                multiplier = 0.2 if player.primary_position == "SP" else 1.0
+                        else:
+                            multiplier = 1.0
+
+                    if snapshot_type == "next_games" and player.team_abbr in win_probs:
+                        prob = win_probs[player.team_abbr]
+                        if prob >= 0.65:
+                            matchup_multiplier = 1.15
+                        elif prob <= 0.35:
+                            matchup_multiplier = 0.85
 
                 player_summaries.append(
                     PlayerStatSummary(
@@ -342,7 +258,6 @@ async def run_recompute_values(snapshot_type: str = "season"):
             )
             response = compute_z_scores(request)
 
-            # Compute rankings from composite values
             sorted_snaps = sorted(
                 response.snapshots,
                 key=lambda s: float(s.composite_value),

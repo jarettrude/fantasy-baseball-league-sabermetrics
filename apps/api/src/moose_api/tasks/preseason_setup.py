@@ -13,8 +13,7 @@ Steps (in order):
 2. Sync rosters (populates players in DB)
 3. Load Lahman crosswalk (sets lahman_id for Stage 3 mapping)
 4. Resolve player ID mappings (5-stage pipeline)
-5. Load FanGraphs 2025 stats (primary valuations)
-6. Lahman fallback seeding (for players not in FanGraphs)
+5. Lahman fallback seeding (for players not in MLB API)
 """
 
 from __future__ import annotations
@@ -70,8 +69,6 @@ class SetupStatus:
             return "sync_rosters"
         if not self.has_mappings:
             return "resolve_mappings"
-        if not self.has_projections:
-            return "load_fangraphs"
         if not self.has_valuations:
             return "compute_values"
         return None
@@ -213,30 +210,12 @@ async def run_preseason_setup(force_reset: bool = False):
 
                 await run_resolve_player_mappings()
                 completed_steps.append("player_mappings")
-                logger.info("[4/6] ✓ Player mappings resolved")
+                logger.info("[4/5] ✓ Player mappings resolved")
             except Exception as e:
-                logger.error("[4/6] ✗ Mapping resolution failed: %s", e)
+                logger.error("[4/5] ✗ Mapping resolution failed: %s", e)
                 failed_steps.append(f"player_mappings: {e}")
         else:
-            logger.info("[4/6] ✓ Mappings exist (skipping)")
-
-        # ── Step 5: Load FanGraphs Stats (Primary) ──
-        status = await check_setup_status()
-        if status.has_players and not status.has_projections:
-            logger.info("[5/5] Loading FanGraphs 2025 stats...")
-            try:
-                from moose_api.tasks.load_fangraphs import (
-                    run_load_fangraphs_stats,
-                )
-
-                await run_load_fangraphs_stats()
-                completed_steps.append("fangraphs_stats")
-                logger.info("[5/5] ✓ FanGraphs data loaded")
-            except Exception as e:
-                logger.error("[5/5] ✗ FanGraphs load failed: %s", e)
-                failed_steps.append(f"fangraphs_stats: {e}")
-        else:
-            logger.info("[5/5] ✓ Projections exist (skipping)")
+            logger.info("[4/5] ✓ Mappings exist (skipping)")
 
         await _notify_result(start_time, completed_steps, failed_steps)
 
