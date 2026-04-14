@@ -325,7 +325,7 @@ class YahooClient:
         base_url = f"{YAHOO_API_BASE}/team/{team_key}/roster"
         modifiers: list[str] = []
 
-        if week:
+        if week is not None:
             modifiers.append(f"week={week}")
         else:
             modifiers.append("out=ranks")
