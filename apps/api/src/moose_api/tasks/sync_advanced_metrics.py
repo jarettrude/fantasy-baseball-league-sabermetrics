@@ -70,7 +70,25 @@ async def run_sync_advanced_metrics():
                             PlayerValueSnapshot.snapshot_date == today,
                         )
                     )
-                    for snap in snapshots_result.scalars().all():
+                    snap = snapshots_result.scalars().first()
+
+                    if not snap:
+                        snap = PlayerValueSnapshot(
+                            player_id=player.id,
+                            snapshot_date=today,
+                            type="season",
+                            category_scores={},
+                            composite_value=0.0,
+                            yahoo_rank=player.yahoo_rank,
+                            our_rank=None,
+                            injury_weight=1.0,
+                            roster_percent=0.0,
+                            roster_trend=0.0,
+                        )
+                        session.add(snap)
+                        updates += 1
+
+                    if snap:
                         if xwoba is not None:
                             snap.xwoba = float(xwoba)
                         if xera is not None:

@@ -314,16 +314,10 @@ async def resolve_player_mappings(ctx):
     await _track_job(ctx, "resolve_player_mappings", run_resolve_player_mappings)
 
 
-async def load_fangraphs_stats(ctx):
-    from moose_api.tasks.load_fangraphs import run_load_fangraphs_stats
+async def load_live_season_stats_job(ctx):
+    from moose_api.tasks.load_live_season_stats import run_load_live_season_stats
 
-    await _track_job(ctx, "load_fangraphs_stats", run_load_fangraphs_stats)
-
-
-async def load_fangraphs_ros(ctx):
-    from moose_api.tasks.load_fangraphs_ros import run_load_fangraphs_ros
-
-    await _track_job(ctx, "load_fangraphs_ros", run_load_fangraphs_ros)
+    await _track_job(ctx, "load_live_season_stats", run_load_live_season_stats)
 
 
 async def run_preseason_setup_job(ctx):
@@ -443,8 +437,7 @@ class WorkerSettings:
         purge_free_agent_snapshots,
         load_mlb_roster_data,
         func(resolve_player_mappings, timeout=900),
-        load_fangraphs_stats,
-        load_fangraphs_ros,
+        load_live_season_stats_job,
         run_preseason_setup_job,
         run_force_preseason_setup_job,
         run_daily_sync_job,
@@ -462,8 +455,7 @@ class WorkerSettings:
         cron(sync_rotowire_injuries, hour={0, 6, 12, 18}, minute=30),
         cron(sync_injury_status, hour={0, 6, 12, 18}, minute=45),
         cron(sync_roster_trends, hour=3, minute=15, run_at_startup=True),
-        cron(load_fangraphs_stats, hour=1, minute=15),
-        cron(load_fangraphs_ros, hour=1, minute=0),
+        cron(load_live_season_stats_job, hour=1, minute=0, run_at_startup=True),
         cron(load_mlb_roster_data, hour=1, minute=30),
         cron(recompute_season_values, hour=4, minute=0, run_at_startup=True),
         cron(recompute_next_games_values, hour=4, minute=15, run_at_startup=True),

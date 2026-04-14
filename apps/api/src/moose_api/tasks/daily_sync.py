@@ -26,6 +26,7 @@ async def run_daily_sync():
             "run_sync_rotowire_injuries",
         ),
         ("sync_injury_status", "moose_api.tasks.sync_injury_status", "run_sync_injury_status"),
+        ("load_live_season_stats", "moose_api.tasks.load_live_season_stats", "run_load_live_season_stats"),
         (
             "recompute_season_values",
             "moose_api.tasks.recompute_values",
@@ -61,7 +62,6 @@ async def run_daily_sync():
         except Exception as e:
             logger.error(f"Daily sync step {name} failed: {e}")
             failed.append(f"{name}: {str(e)}")
-            # For daily sync, we want to continue if reporting fails, but halt if data fetches fail
             if name in ["sync_roster", "sync_free_agents", "recompute_season_values"]:
                 logger.error("Critical daily sync step failed. Halting orchestrator.")
                 break
