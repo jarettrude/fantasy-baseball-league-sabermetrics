@@ -98,13 +98,15 @@ def _map_mlb_stats_to_statline(mlb_stats: dict, player_id: int) -> StatLine:
     """
     is_pitcher = mlb_stats.get("is_pitcher", False)
 
-    # Helper function to get stat value with fallback for different naming conventions
     def get_stat(field_camel: str, field_snake: str, default=0):
-        val = mlb_stats.get(field_camel, default)
-        if val is not None and val != default:
-            return val
-        val = mlb_stats.get(field_snake, default)
-        return val if val is not None else default
+        for field in (field_camel, field_snake):
+            if field in mlb_stats:
+                val = mlb_stats[field]
+                if val is not None and val != "" and val != 0:
+                    return val
+                if isinstance(val, (int, float)) and val == 0:
+                    return val
+        return default
 
     if is_pitcher:
         return StatLine(
