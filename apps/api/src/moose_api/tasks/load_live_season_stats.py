@@ -8,6 +8,7 @@ Replaces FanGraphs as the primary source for in-season player statistics.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import date
 
@@ -121,6 +122,8 @@ async def run_load_live_season_stats():
     This task fetches current season-to-date statistics and populates
     the StatLine table. It should run daily before the valuation engine
     to ensure z-scores are computed from live data.
+
+    Uses concurrent fetching with rate limiting for efficiency.
     """
     try:
         mlb_client = MLBClient()
@@ -145,21 +148,46 @@ async def run_load_live_season_stats():
             )
             logger.info("Deleted %d existing StatLine entries for today", delete_result.rowcount)
 
+            total = len(players)
             inserted_count = 0
             failed_count = 0
+            log_interval = max(1, total // 10)
 
-            for player in players:
-                if not player.mlb_id:
-                    continue
+            async def fetch_and_store(player: Player):
+                nonlocal inserted_count, failed_count
+                try:
+                    if not player.mlb_id:
+                        return (player.id, None, None, None)
+                    mlb_stats = await _fetch_player_season_stats(mlb_client, player.mlb_id, season)
+                    if mlb_stats:
+                        statline = _map_mlb_stats_to_statline(mlb_stats, player.id)
+                        return (player.id, statline, None, None)
+                    else:
+                        failed_count += 1
+                        return (player.id, None, None, None)
+                except Exception as e:
+                    return (player.id, None, e, str(e))
 
-                mlb_stats = await _fetch_player_season_stats(mlb_client, player.mlb_id, season)
+            tasks = [fetch_and_store(player) for player in players]
+            results = await asyncio.gather(*tasks)
 
-                if mlb_stats:
-                    statline = _map_mlb_stats_to_statline(mlb_stats, player.id)
+            for i, result in enumerate(results, 1):
+                player_id, statline, error, error_msg = result
+                if error:
+                    logger.warning("Error fetching stats for player ID %d: %s", player_id, error_msg)
+                    failed_count += 1
+                elif statline:
                     session.add(statline)
                     inserted_count += 1
-                else:
-                    failed_count += 1
+                if i % log_interval == 0 or i == total:
+                    logger.info(
+                        "Progress: %d/%d players processed (%.1f%%), %d inserted, %d failed",
+                        i,
+                        total,
+                        (i / total) * 100,
+                        inserted_count,
+                        failed_count,
+                    )
 
             await session.commit()
 
