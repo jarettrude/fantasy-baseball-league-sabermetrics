@@ -74,10 +74,10 @@ async def fetch_active_mlb_players(
                 "full_name": p.get("fullName", ""),
                 "first_name": p.get("firstName", ""),
                 "last_name": p.get("lastName", ""),
-                "primary_position": (p.get("primaryPosition", {}).get("abbreviation", "")),
-                "team_abbr": (p.get("currentTeam", {}).get("abbreviation") if p.get("currentTeam") else None),
-                "bats": p.get("batSide", {}).get("code", ""),
-                "throws": p.get("pitchHand", {}).get("code", ""),
+                "primary_position": (p.get("primaryPosition") or {}).get("abbreviation", ""),
+                "team_abbr": (p.get("currentTeam") or {}).get("abbreviation") if p.get("currentTeam") else None,
+                "bats": (p.get("batSide") or {}).get("code", ""),
+                "throws": (p.get("pitchHand") or {}).get("code", ""),
             }
         )
 
