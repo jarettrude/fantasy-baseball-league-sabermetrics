@@ -669,8 +669,8 @@ async def regenerate_recap(
     from moose_api.ai.llm_router import LLMError, generate_text, reset_batch_quota_state
     from moose_api.ai.prompt_loader import build_recap_prompt
     from moose_api.models.matchup import Matchup
-    from moose_api.models.roster import RosterSlot
     from moose_api.models.player import Player
+    from moose_api.models.roster import RosterSlot
 
     result = await db.execute(select(Recap).where(Recap.id == recap_id))
     recap = result.scalar_one_or_none()
@@ -718,7 +718,7 @@ async def regenerate_recap(
     )
     historical_matchups = historical_matchups_result.scalars().all()
 
-    team_records = {team_id: {"wins": 0, "losses": 0, "ties": 0} for team_id in teams.keys()}
+    team_records = {team_id: {"wins": 0, "losses": 0, "ties": 0} for team_id in teams}
     for m in historical_matchups:
         if m.team_a_wins > m.team_b_wins:
             if m.team_a_id in team_records:

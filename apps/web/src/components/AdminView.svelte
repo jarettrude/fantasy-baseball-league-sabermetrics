@@ -123,7 +123,10 @@
       columns: "sm:grid-cols-2 lg:grid-cols-3",
       jobs: [
         { name: "load_mlb_roster_data", label: "Force Load MLB API" },
-        { name: "load_live_season_stats", label: "Force Load Live Season Stats" },
+        {
+          name: "load_live_season_stats",
+          label: "Force Load Live Season Stats",
+        },
         {
           name: "run_force_preseason_setup_job",
           label: "FLUSH APP & RESTART SETUP",

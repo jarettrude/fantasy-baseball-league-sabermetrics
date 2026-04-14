@@ -77,7 +77,11 @@
 
   let expandedTeam = $state<string | null>(null);
   let syncingDraft = $state(false);
-  let syncResult = $state<{ imported: number; skipped: number; errors: string[] } | null>(null);
+  let syncResult = $state<{
+    imported: number;
+    skipped: number;
+    errors: string[];
+  } | null>(null);
 
   /**
    * Pull draft picks and player data directly from Yahoo Fantasy Sports API.
@@ -357,9 +361,7 @@
         </button>
       </div>
     {:else if summary.status === "failed"}
-      <div
-        class="card p-6 border-l-4 border-l-(--color-danger) space-y-3"
-      >
+      <div class="card p-6 border-l-4 border-l-(--color-danger) space-y-3">
         <p class="font-mono text-xs font-bold text-(--color-danger)">
           [!] GENERATION FAILED
         </p>
@@ -428,7 +430,9 @@
   {:else if activeTab === "picks"}
     {#if !summary || summary.teams_draft.length === 0}
       <div class="card p-8 text-center space-y-4">
-        <p class="font-mono text-sm font-bold tracking-widest text-(--color-text-muted)">
+        <p
+          class="font-mono text-sm font-bold tracking-widest text-(--color-text-muted)"
+        >
           // NO DRAFT PICKS LOADED //
         </p>
         <p class="font-mono text-[0.6rem] text-(--color-text-muted)">
@@ -512,7 +516,9 @@
                         >
                         <td
                           class="p-3 font-mono text-[0.6rem] text-(--color-text-muted)"
-                          >{pick.round_number}.{String(pick.round_pick).padStart(2, "0")}</td
+                          >{pick.round_number}.{String(
+                            pick.round_pick,
+                          ).padStart(2, "0")}</td
                         >
                         <td
                           class="p-3 font-mono text-xs font-bold text-(--color-text)"
