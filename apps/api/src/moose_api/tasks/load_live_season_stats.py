@@ -11,8 +11,7 @@ from __future__ import annotations
 import logging
 from datetime import date
 
-from sqlalchemy import select
-from sqlalchemy.sql import func
+from sqlalchemy import delete, select
 
 from moose_api.core.database import async_session_factory
 from moose_api.models.notification import CommissionerNotification
@@ -139,7 +138,7 @@ async def run_load_live_season_stats():
 
             today = date.today()
             delete_result = await session.execute(
-                func.delete(StatLine).where(
+                delete(StatLine).where(
                     StatLine.game_date == today,
                     StatLine.source == "mlb_api",
                 )
