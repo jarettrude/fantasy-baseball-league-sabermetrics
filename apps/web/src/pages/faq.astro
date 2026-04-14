@@ -25,17 +25,17 @@ import Footer from "../components/Footer.svelte";
             Player Data Playbook
           </h1>
           <p class="font-mono text-xs text-(--color-text-muted) mt-1">
-            // HOW WE BLEND YAHOO, MLB, FANGRAPHS & VEGAS SIGNALS
+            // HOW WE BLEND YAHOO, MLB & VEGAS SIGNALS
           </p>
         </div>
 
         <section>
           <p class="text-sm text-(--color-text-muted) leading-relaxed">
             Moose Sports Empire is a baseball nerd&#39;s laboratory: we marry
-            official Yahoo fantasy feeds with MLB tracking data, FanGraphs
-            projections, Statcast expected stats, and matchup intel from Vegas
-            markets. Below is a transparent rundown of every source that flows
-            into the Team Bench page and how it shapes the values you see.
+            official Yahoo fantasy feeds with MLB tracking data, Statcast
+            expected stats, and matchup intel from Vegas markets. Below is a
+            transparent rundown of every source that flows into the Team Bench
+            page and how it shapes the values you see.
           </p>
         </section>
 
@@ -88,31 +88,32 @@ import Footer from "../components/Footer.svelte";
               <p
                 class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-commissioner)"
               >
-                FanGraphs Projections
+                MLB Stats API
               </p>
               <h3
                 class="font-display text-lg font-extrabold text-(--color-text)"
               >
-                Projection Baselines
+                Live Season Statistics
               </h3>
               <p class="text-sm text-(--color-text-muted) leading-relaxed">
-                Before stat samples stabilize (or for prospects with limited
-                run), we backfill with FanGraphs projected lines. Every player
-                keeps a <code
+                We fetch season-to-date player statistics directly from the
+                official MLB Stats API. Every player has a
+                <code
                   class="font-mono text-xs bg-(--color-surface-inset) px-1.5 py-0.5 rounded-sm"
-                  >projection_baseline</code
-                > record so nobody gets stranded at zero.
+                  >stat_line</code
+                > record with current season performance data for daily
+                z-score computations.
               </p>
               <ul
                 class="space-y-1 text-sm text-(--color-text-muted) leading-relaxed list-disc pl-5"
               >
                 <li>
-                  Category mapping keeps Yahoo&#39;s labels aligned with FG keys
-                  (e.g., K → SO).
+                  Category mapping keeps Yahoo&#39;s labels aligned with MLB Stats
+                  API fields.
                 </li>
                 <li>
-                  Once real stats exist, projections only fill gaps for missing
-                  categories.
+                  Live stats are fetched daily and used for z-score
+                  computations.
                 </li>
               </ul>
               <p class="font-mono text-[0.6rem] text-(--color-text-muted)">
@@ -241,8 +242,8 @@ import Footer from "../components/Footer.svelte";
                 <li>
                   <strong class="text-(--color-text)"
                     >Assemble player profiles.</strong
-                  > We merge Yahoo stat totals with FanGraphs projections (for missing
-                  data) and include injury status, Yahoo rank, Statcast xStats, and
+                  > We merge Yahoo stat totals with MLB Stats API live data and
+                  include injury status, Yahoo rank, Statcast xStats, and
                   schedule/matchup tags.
                 </li>
                 <li>
