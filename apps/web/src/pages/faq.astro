@@ -88,16 +88,17 @@ import Footer from "../components/Footer.svelte";
               <p
                 class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-commissioner)"
               >
-                MLB Stats API
+                Baseball Savant Statcast API
               </p>
               <h3
                 class="font-display text-lg font-extrabold text-(--color-text)"
               >
-                Live Season Statistics
+                Live Season Statistics (Primary)
               </h3>
               <p class="text-sm text-(--color-text-muted) leading-relaxed">
-                We fetch season-to-date player statistics directly from the
-                official MLB Stats API. Every player has a
+                We fetch season-to-date player statistics primarily from
+                Baseball Savant Statcast API (faster bulk data) with automatic
+                fallback to the official MLB Stats API. Every player has a
                 <code
                   class="font-mono text-xs bg-(--color-surface-inset) px-1.5 py-0.5 rounded-sm"
                   >stat_line</code
@@ -107,16 +108,19 @@ import Footer from "../components/Footer.svelte";
                 class="space-y-1 text-sm text-(--color-text-muted) leading-relaxed list-disc pl-5"
               >
                 <li>
-                  Category mapping keeps Yahoo&#39;s labels aligned with MLB
-                  Stats API fields.
+                  Statcast provides pitch-level data and is significantly faster
+                  for bulk player statistics.
                 </li>
                 <li>
-                  Live stats are fetched daily and used for z-score
-                  computations.
+                  Automatic fallback to MLB Stats API ensures reliability if
+                  Statcast is unavailable.
+                </li>
+                <li>
+                  Live stats are fetched daily and used for z-score computations.
                 </li>
               </ul>
               <p class="font-mono text-[0.6rem] text-(--color-text-muted)">
-                Used for: Early-season stability, bench depth scouting.
+                Used for: Season valuations, daily stat updates.
               </p>
             </div>
 
@@ -124,34 +128,66 @@ import Footer from "../components/Footer.svelte";
               <p
                 class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-commissioner)"
               >
-                MLB + Statcast
+                MLB Stats API
               </p>
               <h3
                 class="font-display text-lg font-extrabold text-(--color-text)"
               >
-                Probable Starters &amp; Expected Skill
+                Roster &amp; Injury Data
               </h3>
               <p class="text-sm text-(--color-text-muted) leading-relaxed">
-                We ping the MLB Stats API for the next week of games to learn
-                which pitchers are lined up for one or two starts. On the skills
-                side, Statcast xwOBA (hitters) and xERA (pitchers) ride
-                alongside value snapshots to surface underlying quality.
+                The official MLB Stats API provides active rosters, player
+                mappings, and injury status updates. We use this to keep
+                player records current and track injury designations.
               </p>
               <ul
                 class="space-y-1 text-sm text-(--color-text-muted) leading-relaxed list-disc pl-5"
               >
                 <li>
-                  2-start SPs earn a hefty schedule multiplier in the <strong
-                    >next 7</strong
-                  > model.
+                  Active roster crosswalk ensures accurate player identification.
                 </li>
+                <li>
+                  Injury status (IL10, IL60, DTD, OUT) seeds our injury weight
+                  multiplier.
+                </li>
+                <li>
+                  Fallback source for player statistics if Statcast is unavailable.
+                </li>
+              </ul>
+              <p class="font-mono text-[0.6rem] text-(--color-text-muted)">
+                Used for: Roster management, injury tracking, stat fallback.
+              </p>
+            </div>
+
+            <div class="card p-5 space-y-3">
+              <p
+                class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-commissioner)"
+              >
+                Statcast xStats
+              </p>
+              <h3
+                class="font-display text-lg font-extrabold text-(--color-text)"
+              >
+                Expected Performance Metrics
+              </h3>
+              <p class="text-sm text-(--color-text-muted) leading-relaxed">
+                Statcast xwOBA (hitters) and xERA (pitchers) ride alongside
+                value snapshots to surface underlying quality and help identify
+                regression candidates.
+              </p>
+              <ul
+                class="space-y-1 text-sm text-(--color-text-muted) leading-relaxed list-disc pl-5"
+              >
                 <li>
                   xStats display in the Bench table so you can sniff regression
                   in or out.
                 </li>
+                <li>
+                  Expected metrics provide context beyond raw counting stats.
+                </li>
               </ul>
               <p class="font-mono text-[0.6rem] text-(--color-text-muted)">
-                Used for: Next-week boosts, xStat columns.
+                Used for: Performance analysis, regression detection.
               </p>
             </div>
 
