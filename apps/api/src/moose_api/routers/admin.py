@@ -59,7 +59,7 @@ VALID_JOBS = [
     "purge_free_agent_snapshots",
     "load_mlb_roster_data",
     "resolve_player_mappings",
-    "load_live_season_stats",
+    "load_live_season_stats_job",
     "run_preseason_setup_job",
     "run_force_preseason_setup_job",
     "run_daily_sync_job",

@@ -124,7 +124,7 @@
       jobs: [
         { name: "load_mlb_roster_data", label: "Force Load MLB API" },
         {
-          name: "load_live_season_stats",
+          name: "load_live_season_stats_job",
           label: "Force Load Live Season Stats",
         },
         {

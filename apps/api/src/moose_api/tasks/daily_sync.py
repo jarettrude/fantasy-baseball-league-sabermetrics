@@ -26,7 +26,7 @@ async def run_daily_sync():
             "run_sync_rotowire_injuries",
         ),
         ("sync_injury_status", "moose_api.tasks.sync_injury_status", "run_sync_injury_status"),
-        ("load_live_season_stats", "moose_api.tasks.load_live_season_stats", "run_load_live_season_stats"),
+        ("load_live_season_stats_job", "moose_api.tasks.load_live_season_stats", "run_load_live_season_stats"),
         (
             "recompute_season_values",
             "moose_api.tasks.recompute_values",

@@ -317,7 +317,7 @@ async def resolve_player_mappings(ctx):
 async def load_live_season_stats_job(ctx):
     from moose_api.tasks.load_live_season_stats import run_load_live_season_stats
 
-    await _track_job(ctx, "load_live_season_stats", run_load_live_season_stats)
+    await _track_job(ctx, "load_live_season_stats_job", run_load_live_season_stats)
 
 
 async def run_preseason_setup_job(ctx):
