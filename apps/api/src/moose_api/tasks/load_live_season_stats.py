@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 from datetime import date
 
 from sqlalchemy import delete, select
@@ -30,21 +31,28 @@ async def _fetch_player_season_stats(
     mlb_client: MLBClient,
     mlb_id: int,
     season: int,
+    bulk_statcast_data: dict | None = None,
 ) -> dict | None:
     """Fetch season-to-date stats for a single player using hybrid approach.
 
-    Tries Statcast API first (faster bulk data), falls back to MLB Stats API.
+    Tries bulk Statcast data first (if provided), then individual Statcast API,
+    and finally falls back to MLB Stats API.
 
     Args:
         statcast_client: Statcast API client (may be None if unavailable)
         mlb_client: MLB Stats API client
         mlb_id: MLB player ID
         season: Season year
+        bulk_statcast_data: Pre-fetched bulk Statcast data by player ID
 
     Returns:
         Dict with hitting or pitching stats, or None if no data available
     """
-    # Try Statcast API first (faster)
+    # Try bulk Statcast data first (fastest)
+    if bulk_statcast_data and mlb_id in bulk_statcast_data:
+        return bulk_statcast_data[mlb_id]
+
+    # Try individual Statcast API (fallback)
     if statcast_client:
         try:
             stats = await statcast_client.fetch_player_stats(mlb_id, season, "hitting")
@@ -102,10 +110,22 @@ def _map_mlb_stats_to_statline(mlb_stats: dict, player_id: int) -> StatLine:
         for field in (field_camel, field_snake):
             if field in mlb_stats:
                 val = mlb_stats[field]
-                if val is not None and val != "" and val != 0:
+                if val is None or val == "":
+                    continue
+                if isinstance(val, (int, float)):
+                    # Check for NaN values
+                    if isinstance(val, float) and math.isnan(val):
+                        continue
                     return val
-                if isinstance(val, (int, float)) and val == 0:
-                    return val
+                if isinstance(val, str):
+                    try:
+                        # Try converting to int first, then float for decimal stats
+                        if "." in val:
+                            return float(val)
+                        else:
+                            return int(val)
+                    except (ValueError, TypeError):
+                        continue
         return default
 
     if is_pitcher:
@@ -158,9 +178,8 @@ async def run_load_live_season_stats():
     """Load live season stats from MLB Stats API for all players.
 
     This task fetches current season-to-date statistics primarily from
-    Baseball Savant Statcast API (faster bulk data) with fallback to
-    official MLB Stats API. Populates the StatLine table for daily
-    z-score computations.
+    Baseball Savant Statcast API (faster) with fallback to official
+    MLB Stats API. Populates the StatLine table for daily z-score computations.
 
     Uses concurrent fetching with rate limiting for efficiency.
     """
@@ -177,6 +196,36 @@ async def run_load_live_season_stats():
 
         mlb_client = MLBClient()
         season = date.today().year
+
+        # Fetch bulk Statcast data once if available
+        bulk_statcast_data = None
+        if statcast_client:
+            try:
+                start_dt = f"{season}-03-01"
+                end_dt = f"{season}-12-31"
+                logger.info("Fetching bulk Statcast data for season %d", season)
+
+                # Fetch both hitting and pitching data
+                hitting_data = await statcast_client.fetch_bulk_stats(start_dt, end_dt, "hitting")
+                pitching_data = await statcast_client.fetch_bulk_stats(start_dt, end_dt, "pitching")
+
+                # Merge the data (handle players who appear in both)
+                bulk_statcast_data = {}
+                for player_id, stats in hitting_data.items():
+                    bulk_statcast_data[player_id] = stats
+                for player_id, stats in pitching_data.items():
+                    # If player already exists (two-way player), keep the pitcher role
+                    bulk_statcast_data[player_id] = stats
+
+                logger.info(
+                    "Fetched Statcast data for %d players (%d hitting, %d pitching)",
+                    len(bulk_statcast_data),
+                    len(hitting_data),
+                    len(pitching_data),
+                )
+            except Exception as e:
+                logger.warning("Bulk Statcast fetch failed, falling back to individual queries: %s", e)
+                bulk_statcast_data = None
 
         async with async_session_factory() as session:
             players_result = await session.execute(select(Player).where(Player.mlb_id.isnot(None)))
@@ -207,7 +256,9 @@ async def run_load_live_season_stats():
                 try:
                     if not player.mlb_id:
                         return (player.id, None, None, None)
-                    mlb_stats = await _fetch_player_season_stats(statcast_client, mlb_client, player.mlb_id, season)
+                    mlb_stats = await _fetch_player_season_stats(
+                        statcast_client, mlb_client, player.mlb_id, season, bulk_statcast_data
+                    )
                     if mlb_stats:
                         statline = _map_mlb_stats_to_statline(mlb_stats, player.id)
                         return (player.id, statline, None, None)
