@@ -440,7 +440,7 @@ class WorkerSettings:
         func(load_live_season_stats_job, timeout=900),
         run_preseason_setup_job,
         run_force_preseason_setup_job,
-        run_daily_sync_job,
+        func(run_daily_sync_job, timeout=900),
         generate_briefings,
         generate_briefings_force,
         generate_draft_summary,

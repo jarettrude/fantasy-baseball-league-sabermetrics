@@ -1,7 +1,8 @@
-"""Load live 2026 season stats from MLB Stats API.
+"""Load live 2026 season stats from MLB Stats API with Statcast fallback.
 
-Fetches season-to-date player statistics from the official MLB Stats API
-and populates the StatLine table for daily z-score computations.
+Fetches season-to-date player statistics primarily from Baseball Savant Statcast API
+(faster bulk data) with fallback to official MLB Stats API. Populates the StatLine
+table for daily z-score computations.
 
 Replaces FanGraphs as the primary source for in-season player statistics.
 """
@@ -19,14 +20,23 @@ from moose_api.models.notification import CommissionerNotification
 from moose_api.models.player import Player
 from moose_api.models.stats import StatLine
 from moose_api.services.mlb_client import MLBClient
+from moose_api.services.statcast_client import StatcastClient
 
 logger = logging.getLogger(__name__)
 
 
-async def _fetch_player_season_stats(mlb_client: MLBClient, mlb_id: int, season: int) -> dict | None:
-    """Fetch season-to-date stats for a single player from MLB Stats API.
+async def _fetch_player_season_stats(
+    statcast_client: StatcastClient | None,
+    mlb_client: MLBClient,
+    mlb_id: int,
+    season: int,
+) -> dict | None:
+    """Fetch season-to-date stats for a single player using hybrid approach.
+
+    Tries Statcast API first (faster bulk data), falls back to MLB Stats API.
 
     Args:
+        statcast_client: Statcast API client (may be None if unavailable)
         mlb_client: MLB Stats API client
         mlb_id: MLB player ID
         season: Season year
@@ -34,6 +44,22 @@ async def _fetch_player_season_stats(mlb_client: MLBClient, mlb_id: int, season:
     Returns:
         Dict with hitting or pitching stats, or None if no data available
     """
+    # Try Statcast API first (faster)
+    if statcast_client:
+        try:
+            stats = await statcast_client.fetch_player_stats(mlb_id, season, "hitting")
+            if stats:
+                stats["is_pitcher"] = False
+                return stats
+
+            stats = await statcast_client.fetch_player_stats(mlb_id, season, "pitching")
+            if stats:
+                stats["is_pitcher"] = True
+                return stats
+        except Exception as e:
+            logger.debug("Statcast fetch failed for player %d, trying MLB API: %s", mlb_id, e)
+
+    # Fallback to MLB Stats API
     try:
         hitting_data = await mlb_client.get_player_stats(mlb_id, season, "hitting")
 
@@ -52,23 +78,29 @@ async def _fetch_player_season_stats(mlb_client: MLBClient, mlb_id: int, season:
                 return stats
 
         return None
-
     except Exception as e:
-        logger.warning("Failed to fetch stats for MLB ID %d: %s", mlb_id, e)
+        logger.error("Error fetching MLB stats for player %d: %s", mlb_id, e)
         return None
 
 
 def _map_mlb_stats_to_statline(mlb_stats: dict, player_id: int) -> StatLine:
-    """Map MLB Stats API response to StatLine model.
+    """Map MLB Stats API or Statcast response to StatLine model.
+
+    Supports both MLB API camelCase (e.g., 'strikeOuts') and Statcast
+    snake_case (e.g., 'strikeouts') field naming conventions.
 
     Args:
-        mlb_stats: Stats dict from MLB API
+        mlb_stats: Stats dict from MLB API or Statcast
         player_id: Database player ID
 
     Returns:
         StatLine instance
     """
     is_pitcher = mlb_stats.get("is_pitcher", False)
+
+    # Helper function to get stat value with fallback for different naming conventions
+    def get_stat(field_camel: str, field_snake: str, default=0):
+        return mlb_stats.get(field_camel) or mlb_stats.get(field_snake) or default
 
     if is_pitcher:
         return StatLine(
@@ -83,14 +115,14 @@ def _map_mlb_stats_to_statline(mlb_stats: dict, player_id: int) -> StatLine:
             hits=0,
             at_bats=0,
             batting_avg=None,
-            wins=mlb_stats.get("wins"),
-            saves=mlb_stats.get("saves"),
-            strikeouts=mlb_stats.get("strikeOuts"),
-            innings_pitched=mlb_stats.get("inningsPitched"),
-            earned_runs=mlb_stats.get("earnedRuns"),
-            walks=mlb_stats.get("baseOnBalls"),
-            era=mlb_stats.get("era"),
-            whip=mlb_stats.get("whip"),
+            wins=get_stat("wins", "wins"),
+            saves=get_stat("saves", "saves"),
+            strikeouts=get_stat("strikeOuts", "strikeouts"),
+            innings_pitched=get_stat("inningsPitched", "innings_pitched"),
+            earned_runs=get_stat("earnedRuns", "earned_runs"),
+            walks=get_stat("baseOnBalls", "walks"),
+            era=get_stat("era", "era", default=None),
+            whip=get_stat("whip", "whip", default=None),
         )
     else:
         return StatLine(
@@ -98,19 +130,19 @@ def _map_mlb_stats_to_statline(mlb_stats: dict, player_id: int) -> StatLine:
             game_date=date.today(),
             source="mlb_api",
             is_pitcher=False,
-            runs=mlb_stats.get("runs"),
-            home_runs=mlb_stats.get("homeRuns"),
-            rbi=mlb_stats.get("rbi"),
-            stolen_bases=mlb_stats.get("stolenBases"),
-            hits=mlb_stats.get("hits"),
-            at_bats=mlb_stats.get("atBats"),
-            batting_avg=mlb_stats.get("avg"),
+            runs=get_stat("runs", "runs"),
+            home_runs=get_stat("homeRuns", "home_runs"),
+            rbi=get_stat("rbi", "rbi"),
+            stolen_bases=get_stat("stolenBases", "stolen_bases"),
+            hits=get_stat("hits", "hits"),
+            at_bats=get_stat("atBats", "at_bats"),
+            batting_avg=get_stat("avg", "avg", default=None),
             wins=0,
             saves=0,
-            strikeouts=mlb_stats.get("strikeOuts"),
+            strikeouts=get_stat("strikeOuts", "strikeouts"),
             innings_pitched=0,
             earned_runs=0,
-            walks=mlb_stats.get("baseOnBalls"),
+            walks=get_stat("baseOnBalls", "walks"),
             era=None,
             whip=None,
         )
@@ -119,14 +151,24 @@ def _map_mlb_stats_to_statline(mlb_stats: dict, player_id: int) -> StatLine:
 async def run_load_live_season_stats():
     """Load live season stats from MLB Stats API for all players.
 
-    This task fetches current season-to-date statistics and populates
-    the StatLine table. It should run daily before the valuation engine
-    to ensure z-scores are computed from live data.
+    This task fetches current season-to-date statistics primarily from
+    Baseball Savant Statcast API (faster bulk data) with fallback to
+    official MLB Stats API. Populates the StatLine table for daily
+    z-score computations.
 
     Uses concurrent fetching with rate limiting for efficiency.
     """
     mlb_client = None
+    statcast_client = None
     try:
+        # Initialize Statcast client (may fail if pybaseball not installed)
+        try:
+            statcast_client = StatcastClient()
+            logger.info("Statcast client initialized successfully")
+        except ImportError:
+            logger.warning("Statcast client unavailable, using MLB Stats API only")
+            statcast_client = None
+
         mlb_client = MLBClient()
         season = date.today().year
 
@@ -159,7 +201,7 @@ async def run_load_live_season_stats():
                 try:
                     if not player.mlb_id:
                         return (player.id, None, None, None)
-                    mlb_stats = await _fetch_player_season_stats(mlb_client, player.mlb_id, season)
+                    mlb_stats = await _fetch_player_season_stats(statcast_client, mlb_client, player.mlb_id, season)
                     if mlb_stats:
                         statline = _map_mlb_stats_to_statline(mlb_stats, player.id)
                         return (player.id, statline, None, None)
@@ -219,5 +261,7 @@ async def run_load_live_season_stats():
             await session.commit()
         raise
     finally:
+        if statcast_client:
+            await statcast_client.close()
         if mlb_client:
             await mlb_client.close()
