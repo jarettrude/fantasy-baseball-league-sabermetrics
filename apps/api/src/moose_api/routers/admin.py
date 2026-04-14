@@ -740,8 +740,8 @@ async def regenerate_recap(
         teams.values(),
         key=lambda t: (
             -team_records[t.id]["wins"],
-            -team_records[t.id]["ties"],
             team_records[t.id]["losses"],
+            -team_records[t.id]["ties"],
         ),
     )
     standings_data = []
