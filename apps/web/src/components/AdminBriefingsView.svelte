@@ -121,7 +121,7 @@
 
   function startEdit(briefing: Briefing) {
     editingBriefing = briefing;
-    editContent = briefing.content ?? '';
+    editContent = briefing.content ?? "";
   }
 
   function cancelEdit() {
