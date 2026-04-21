@@ -108,6 +108,65 @@ class FreeAgentResponse(BaseModel):
     is_available: bool
 
 
+class ValuedPlayerResponse(BaseModel):
+    """A player bundled with their latest season/next-games composite values.
+
+    Compact projection used by the recommendations endpoint and briefing
+    payloads so the consumer does not need to rehydrate full
+    ``PlayerValueResponse`` objects for simple ranking comparisons.
+    """
+
+    id: int
+    name: str
+    primary_position: str
+    eligible_positions: list[str]
+    team_abbr: str | None
+    is_pitcher: bool
+    injury_status: str | None
+    composite_value: Decimal
+    next_games_value: Decimal | None = None
+    our_rank: int | None = None
+    yahoo_rank: int | None = None
+    roster_slot: str | None = None
+
+
+class PositionUpgradeResponse(BaseModel):
+    """Per-position comparison between the weakest starter and top waivers."""
+
+    position: str
+    incumbent: ValuedPlayerResponse | None
+    top_free_agents: list[ValuedPlayerResponse]
+    delta: Decimal | None
+    recommend: bool
+
+
+class DropCandidateResponse(BaseModel):
+    """A roster player the manager should consider dropping.
+
+    ``reason`` distinguishes a purely global worst-value flag from a
+    position-aligned upgrade recommendation. When ``reason`` is
+    ``"upgrade_available_at_position"`` the ``replacement`` and
+    ``delta`` fields describe the matched pickup.
+    """
+
+    player: ValuedPlayerResponse
+    reason: str
+    position: str | None = None
+    replacement: ValuedPlayerResponse | None = None
+    delta: Decimal | None = None
+
+
+class BenchRecommendationsResponse(BaseModel):
+    """Position-aligned drop/pickup plan for the authenticated manager's team."""
+
+    team_id: int
+    team_name: str
+    roster: list[ValuedPlayerResponse]
+    drop_candidates: list[DropCandidateResponse]
+    upgrades_by_position: dict[str, PositionUpgradeResponse]
+    top_fa_overall: list[ValuedPlayerResponse]
+
+
 class FreeAgentListResponse(BaseModel):
     """Response model for free agent list.
 

@@ -14,40 +14,63 @@ from moose_api.models.roster import RosterSlot
 from moose_api.models.stats import PlayerValueSnapshot
 from moose_api.models.team import Team
 from moose_api.schemas.player import (
+    BenchRecommendationsResponse,
     BenchResponse,
+    DropCandidateResponse,
     FreeAgentListResponse,
     FreeAgentResponse,
     PlayerMappingResponse,
     PlayerMappingUpdateRequest,
     PlayerResponse,
     PlayerValueResponse,
+    PositionUpgradeResponse,
     RosterSlotResponse,
+    ValuedPlayerResponse,
+)
+from moose_api.services.roster_optimizer import (
+    DropCandidate,
+    PositionUpgrade,
+    ValuedPlayer,
+    build_recommendations,
 )
 
 router = APIRouter(prefix="/players", tags=["players"])
 
 
-async def _get_player_value(db: AsyncSession, player_id: int, snapshot_type: str) -> PlayerValueSnapshot | None:
-    """Retrieve the most recent value computation snapshot for a given player.
+async def _latest_values_for_players(
+    db: AsyncSession, player_ids: list[int]
+) -> tuple[dict[int, PlayerValueSnapshot], dict[int, PlayerValueSnapshot]]:
+    """Return the latest season and next_games snapshots for a set of players.
+
+    Performs a single query across both snapshot types and folds the rows
+    into two ``player_id -> snapshot`` dicts, keeping the newest row per
+    ``(player_id, type)``. Used instead of per-player lookups to avoid
+    N+1 query fan-out on roster/free-agent pages.
 
     Args:
-        db: Database session
-        player_id: Player ID to fetch value for
-        snapshot_type: Type of snapshot ('season' or 'next_games')
+        db: Active async session.
+        player_ids: Players whose latest snapshots are needed. Empty input
+            short-circuits to two empty dicts.
 
     Returns:
-        Most recent PlayerValueSnapshot or None if not found
+        ``(season_by_player_id, next_games_by_player_id)``.
     """
+    season_vals: dict[int, PlayerValueSnapshot] = {}
+    next_vals: dict[int, PlayerValueSnapshot] = {}
+    if not player_ids:
+        return season_vals, next_vals
+
     result = await db.execute(
         select(PlayerValueSnapshot)
-        .where(
-            PlayerValueSnapshot.player_id == player_id,
-            PlayerValueSnapshot.type == snapshot_type,
-        )
+        .where(PlayerValueSnapshot.player_id.in_(player_ids))
         .order_by(PlayerValueSnapshot.snapshot_date.desc())
-        .limit(1)
     )
-    return result.scalar_one_or_none()
+    for snap in result.scalars():
+        bucket = season_vals if snap.type == "season" else next_vals if snap.type == "next_games" else None
+        if bucket is not None and snap.player_id not in bucket:
+            bucket[snap.player_id] = snap
+
+    return season_vals, next_vals
 
 
 def _player_to_response(p: Player) -> PlayerResponse:
@@ -134,33 +157,31 @@ async def get_bench(
 
     league_result = await db.execute(select(League).limit(1))
     league = league_result.scalar_one_or_none()
-    current_week = league.current_week or 1 if league else 1
+    current_week = league.current_week if league and league.current_week is not None else 1
 
     roster_result = await db.execute(
-        select(RosterSlot).where(
+        select(RosterSlot, Player)
+        .join(Player, Player.id == RosterSlot.player_id)
+        .where(
             RosterSlot.team_id == team.id,
             RosterSlot.week == current_week,
             RosterSlot.is_active.is_(True),
         )
     )
-    roster_slots = roster_result.scalars().all()
+    roster_rows = roster_result.all()
 
-    roster_responses = []
-    for slot in roster_slots:
-        player_result = await db.execute(select(Player).where(Player.id == slot.player_id))
-        player = player_result.scalar_one_or_none()
-        if not player:
-            continue
-        season_val = await _get_player_value(db, player.id, "season")
-        next_val = await _get_player_value(db, player.id, "next_games")
-        roster_responses.append(
-            RosterSlotResponse(
-                player=_player_to_response(player),
-                position=slot.position,
-                season_value=_snapshot_to_response(season_val, player),
-                next_games_value=_snapshot_to_response(next_val, player),
-            )
+    player_ids = [player.id for _, player in roster_rows]
+    season_vals, next_vals = await _latest_values_for_players(db, player_ids)
+
+    roster_responses = [
+        RosterSlotResponse(
+            player=_player_to_response(player),
+            position=slot.position,
+            season_value=_snapshot_to_response(season_vals.get(player.id), player),
+            next_games_value=_snapshot_to_response(next_vals.get(player.id), player),
         )
+        for slot, player in roster_rows
+    ]
 
     max_season_res = await db.execute(
         select(func.max(PlayerValueSnapshot.snapshot_date)).where(PlayerValueSnapshot.type == "season")
@@ -230,6 +251,79 @@ async def mark_briefings_read(
     return {"status": "ok"}
 
 
+def _valued_to_schema(vp: ValuedPlayer | None) -> ValuedPlayerResponse | None:
+    """Convert a ``ValuedPlayer`` dataclass to its wire schema."""
+    if vp is None:
+        return None
+    return ValuedPlayerResponse(
+        id=vp.player.id,
+        name=vp.player.name,
+        primary_position=vp.player.primary_position,
+        eligible_positions=list(vp.player.eligible_positions),
+        team_abbr=vp.player.team_abbr,
+        is_pitcher=vp.player.is_pitcher,
+        injury_status=vp.player.injury_status,
+        composite_value=vp.composite_value,
+        next_games_value=vp.next_games_value,
+        our_rank=vp.our_rank,
+        yahoo_rank=vp.yahoo_rank,
+        roster_slot=vp.roster_slot,
+    )
+
+
+def _drop_to_schema(drop: DropCandidate) -> DropCandidateResponse:
+    return DropCandidateResponse(
+        player=_valued_to_schema(drop.player),
+        reason=drop.reason,
+        position=drop.position,
+        replacement=_valued_to_schema(drop.replacement),
+        delta=drop.delta,
+    )
+
+
+def _upgrade_to_schema(up: PositionUpgrade) -> PositionUpgradeResponse:
+    return PositionUpgradeResponse(
+        position=up.position,
+        incumbent=_valued_to_schema(up.incumbent),
+        top_free_agents=[_valued_to_schema(vp) for vp in up.top_free_agents],
+        delta=up.delta,
+        recommend=up.recommend,
+    )
+
+
+@router.get("/bench/recommendations", response_model=BenchRecommendationsResponse)
+async def get_bench_recommendations(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return position-aligned drop and pickup recommendations.
+
+    Delegates to ``services.roster_optimizer.build_recommendations`` so
+    the payload matches the structure consumed by the daily manager
+    briefing LLM prompt. This is the single source of truth for roster
+    optimization suggestions across the product.
+    """
+    team_result = await db.execute(select(Team).where(Team.manager_user_id == current_user["id"]))
+    team = team_result.scalar_one_or_none()
+    if not team:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")
+
+    league_result = await db.execute(select(League).limit(1))
+    league = league_result.scalar_one_or_none()
+    current_week = league.current_week if league and league.current_week is not None else 1
+
+    rec = await build_recommendations(db, team, league, current_week)
+
+    return BenchRecommendationsResponse(
+        team_id=rec.team_id,
+        team_name=rec.team_name,
+        roster=[_valued_to_schema(vp) for vp in rec.roster],
+        drop_candidates=[_drop_to_schema(d) for d in rec.drop_candidates],
+        upgrades_by_position={pos: _upgrade_to_schema(up) for pos, up in rec.upgrades_by_position.items()},
+        top_fa_overall=[_valued_to_schema(vp) for vp in rec.top_fa_overall],
+    )
+
+
 @router.get("/free-agents", response_model=FreeAgentListResponse)
 async def get_free_agents(
     position: str | None = Query(None),
@@ -276,24 +370,7 @@ async def get_free_agents(
         return FreeAgentListResponse(free_agents=[], snapshot_at=None)
 
     player_ids = [r.Player.id for r in rows]
-
-    # 3. Batch fetch all valuation snapshots for these players at once! (Fixes N+1 issue)
-    val_query = (
-        select(PlayerValueSnapshot)
-        .where(PlayerValueSnapshot.player_id.in_(player_ids))
-        .order_by(PlayerValueSnapshot.snapshot_date.desc())
-    )
-    val_result = await db.execute(val_query)
-    all_vals = val_result.scalars().all()
-
-    season_vals = {}
-    next_vals = {}
-
-    for v in all_vals:
-        if v.type == "season" and v.player_id not in season_vals:
-            season_vals[v.player_id] = v
-        elif v.type == "next_games" and v.player_id not in next_vals:
-            next_vals[v.player_id] = v
+    season_vals, next_vals = await _latest_values_for_players(db, player_ids)
 
     fa_responses = []
     for _snap, player in rows:

@@ -107,7 +107,7 @@ async def run_generate_recaps():
                 logger.warning("No league found, skipping recap generation")
                 return
 
-            current_week = league.current_week or 1
+            current_week = league.current_week if league.current_week is not None else 1
             recap_week = current_week - 1
 
             # Fallback: if current_week hasn't advanced but 8+ days since last recap

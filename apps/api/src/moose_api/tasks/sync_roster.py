@@ -11,6 +11,11 @@ import logging
 from datetime import UTC, datetime
 
 from sqlalchemy import select
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from moose_api.core.database import async_session_factory
 from moose_api.models.league import League
@@ -23,6 +28,11 @@ from moose_api.tasks.sync_league import _get_yahoo_client, _resolve_league_key
 logger = logging.getLogger(__name__)
 
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    reraise=True,
+)
 async def run_sync_roster():
     """Sync all team rosters from Yahoo for the current week."""
     try:
@@ -36,7 +46,7 @@ async def run_sync_roster():
                 logger.warning("No league found, skipping roster sync")
                 return
 
-            current_week = league.current_week or 1
+            current_week = league.current_week if league.current_week is not None else 1
             season = league.season
 
             teams_result = await session.execute(select(Team).where(Team.league_id == league.id))
