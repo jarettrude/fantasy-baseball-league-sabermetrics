@@ -11,6 +11,11 @@ from datetime import date, timedelta
 
 import httpx
 from sqlalchemy import func, select
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from moose_api.core.database import async_session_factory
 from moose_api.models.league import League
@@ -130,6 +135,11 @@ async def _load_statline_stats(
     return sum_queries
 
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    reraise=True,
+)
 async def _fetch_mlb_starts(days: int = 7) -> dict[int, int]:
     """Fetch probable pitchers for the next N days to identify 2-start pitchers."""
     today = date.today()

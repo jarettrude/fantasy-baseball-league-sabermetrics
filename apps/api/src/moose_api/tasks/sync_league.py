@@ -9,6 +9,12 @@ from __future__ import annotations
 import logging
 
 from sqlalchemy import select
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from moose_api.core.config import settings
 from moose_api.core.database import async_session_factory
@@ -50,6 +56,11 @@ def _resolve_league_key() -> str:
     return f"mlb.l.{league_id}"
 
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    reraise=True,
+)
 async def run_sync_league_meta():
     try:
         client = await _get_yahoo_client()
@@ -259,6 +270,11 @@ def _compute_category_results(
     return team_a_stats, team_b_stats, category_results, team_a_wins, team_b_wins, ties
 
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    reraise=True,
+)
 async def run_sync_matchups():
     """Sync matchups for all weeks (current + historical).
 

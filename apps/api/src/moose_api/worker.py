@@ -435,7 +435,7 @@ class WorkerSettings:
         purge_session_logs,
         purge_ai_prompt_raw,
         purge_free_agent_snapshots,
-        load_mlb_roster_data,
+        func(load_mlb_roster_data, timeout=900),
         func(resolve_player_mappings, timeout=900),
         func(load_live_season_stats_job, timeout=900),
         run_preseason_setup_job,

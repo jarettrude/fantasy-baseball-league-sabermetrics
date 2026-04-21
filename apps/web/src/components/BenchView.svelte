@@ -12,6 +12,7 @@
   import { navigate } from "astro:transitions/client";
 
   let data: any = $state(null);
+  let recommendations: any = $state(null);
   let loading = $state(true);
   let error = $state<string | null>(null);
 
@@ -110,15 +111,39 @@
     return new Date(ts).toLocaleString();
   }
 
+  /**
+   * Position-aware drop/pickup plan sourced from the server. When present,
+   * this replaces the legacy client-side "three lowest composites" heuristic
+   * with the same analysis the morning briefing LLM receives, so UI alerts
+   * and LLM recommendations stay in lockstep.
+   */
   let dropCandidates = $derived(
-    sortedRoster
-      .filter((s: any) => s.season_value !== null)
-      .sort(
-        (a: any, b: any) =>
-          Number(a.season_value?.composite_value ?? 0) -
-          Number(b.season_value?.composite_value ?? 0),
+    (recommendations?.drop_candidates ?? []) as Array<{
+      player: any;
+      reason: string;
+      position: string | null;
+      replacement: any | null;
+      delta: number | null;
+    }>,
+  );
+
+  let standaloneUpgrades = $derived(
+    Object.entries(
+      (recommendations?.upgrades_by_position ?? {}) as Record<string, any>,
+    )
+      .filter(([, up]) => up?.recommend && up?.incumbent)
+      .filter(
+        ([, up]) =>
+          !dropCandidates.some(
+            (d) => d.player?.id === up.incumbent?.id,
+          ),
       )
-      .slice(0, 3),
+      .map(([position, up]) => ({
+        position,
+        incumbent: up.incumbent,
+        replacement: up.top_free_agents?.[0] ?? null,
+        delta: up.delta ?? null,
+      })),
   );
 
   onMount(async () => {
@@ -128,7 +153,20 @@
       return;
     }
     try {
-      data = await api.get("/players/bench");
+      const [benchData, recData] = await Promise.all([
+        api.get("/players/bench"),
+        api
+          .get("/players/bench/recommendations")
+          .catch((e: any) => {
+            console.warn(
+              "Failed to load bench recommendations; falling back to roster only",
+              e,
+            );
+            return null;
+          }),
+      ]);
+      data = benchData;
+      recommendations = recData;
 
       if (data?.briefing && !data.briefing.is_viewed) {
         try {
@@ -277,7 +315,7 @@
     </div>
   {/if}
 
-  {#if dropCandidates.length > 0}
+  {#if dropCandidates.length > 0 || standaloneUpgrades.length > 0}
     <div class="card p-5 mb-6 border-l-4 border-l-(--color-warning)">
       <div class="mb-3">
         <span
@@ -286,23 +324,127 @@
           ROSTER ALERT
         </span>
         <p class="font-mono text-[0.6rem] text-(--color-text-muted) mt-0.5">
-          // ROSTER INEFFICIENCIES DETECTED
+          // POSITION-ALIGNED DROP / PICKUP PLAN
         </p>
       </div>
-      <div class="flex flex-wrap gap-3">
-        {#each dropCandidates as slot}
-          <div
-            class="flex items-center gap-2 rounded-sm bg-(--color-warning-muted) border border-(--color-warning)/30 px-3 py-2"
+
+      {#if dropCandidates.length > 0}
+        <div class="flex flex-col gap-2 mb-3">
+          {#each dropCandidates as drop}
+            <div
+              class="flex flex-wrap items-center gap-2 rounded-sm bg-(--color-warning-muted) border border-(--color-warning)/30 px-3 py-2"
+            >
+              <span
+                class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-warning)"
+              >
+                DROP
+              </span>
+              <span class="font-display text-sm font-bold text-(--color-text)">
+                {drop.player.name}
+              </span>
+              {#if drop.position}
+                <span
+                  class="font-mono text-[0.6rem] text-(--color-text-muted) uppercase"
+                  >({drop.position})</span
+                >
+              {/if}
+              <span class="font-mono text-xs font-bold text-(--color-warning)">
+                {Number(drop.player.composite_value ?? 0).toFixed(2)}
+              </span>
+
+              {#if drop.replacement}
+                <span
+                  class="font-mono text-[0.6rem] text-(--color-text-muted)"
+                  aria-hidden="true">→</span
+                >
+                <span
+                  class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-success)"
+                >
+                  ADD
+                </span>
+                <span
+                  class="font-display text-sm font-bold text-(--color-text)"
+                >
+                  {drop.replacement.name}
+                </span>
+                <span
+                  class="font-mono text-xs font-bold text-(--color-success)"
+                >
+                  {Number(drop.replacement.composite_value ?? 0).toFixed(2)}
+                </span>
+                {#if drop.delta !== null && drop.delta !== undefined}
+                  <span
+                    class="font-mono text-[0.6rem] text-(--color-success)"
+                    title="Projected composite-value gain"
+                  >
+                    +{Number(drop.delta).toFixed(2)}
+                  </span>
+                {/if}
+              {:else}
+                <span
+                  class="font-mono text-[0.6rem] text-(--color-text-muted) italic"
+                >
+                  no positional upgrade on waivers
+                </span>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      {/if}
+
+      {#if standaloneUpgrades.length > 0}
+        <div>
+          <p
+            class="font-mono text-[0.6rem] text-(--color-text-muted) tracking-wide mb-2 uppercase"
           >
-            <div class="font-display text-sm font-bold text-(--color-text)">
-              {slot.player.name}
-            </div>
-            <div class="font-mono text-xs font-bold text-(--color-warning)">
-              {Number(slot.season_value?.composite_value ?? 0).toFixed(2)}
-            </div>
+            // Overlooked positional upgrades
+          </p>
+          <div class="flex flex-col gap-2">
+            {#each standaloneUpgrades as up}
+              <div
+                class="flex flex-wrap items-center gap-2 rounded-sm bg-(--color-surface-raised) border border-(--color-border-subtle) px-3 py-2"
+              >
+                <span
+                  class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-text-muted)"
+                >
+                  {up.position}
+                </span>
+                <span
+                  class="font-display text-sm font-bold text-(--color-text)"
+                >
+                  {up.incumbent.name}
+                </span>
+                <span
+                  class="font-mono text-xs text-(--color-text-muted)"
+                >
+                  {Number(up.incumbent.composite_value ?? 0).toFixed(2)}
+                </span>
+                {#if up.replacement}
+                  <span
+                    class="font-mono text-[0.6rem] text-(--color-text-muted)"
+                    aria-hidden="true">→</span
+                  >
+                  <span
+                    class="font-display text-sm font-bold text-(--color-success)"
+                  >
+                    {up.replacement.name}
+                  </span>
+                  <span
+                    class="font-mono text-xs font-bold text-(--color-success)"
+                  >
+                    {Number(up.replacement.composite_value ?? 0).toFixed(2)}
+                  </span>
+                  {#if up.delta !== null && up.delta !== undefined}
+                    <span class="font-mono text-[0.6rem] text-(--color-success)">
+                      +{Number(up.delta).toFixed(2)}
+                    </span>
+                  {/if}
+                {/if}
+              </div>
+            {/each}
           </div>
-        {/each}
-      </div>
+        </div>
+      {/if}
     </div>
   {/if}
 

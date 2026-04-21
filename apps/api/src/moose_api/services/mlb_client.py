@@ -71,6 +71,84 @@ class MLBClient:
     async def close(self):
         await self._client.aclose()
 
+    async def get_bulk_season_stats(
+        self,
+        season: int,
+        group: str = "hitting",
+        page_size: int = 1000,
+        max_pages: int = 20,
+    ) -> dict[int, dict]:
+        """Fetch season-to-date stats for every MLB player in one group.
+
+        Uses the league-wide `/stats` endpoint, which returns all players in a
+        single group paginated by ``limit``/``offset``. This is dramatically
+        faster than per-player ``/people/{id}/stats`` calls (seconds vs. hours)
+        and returns the fantasy-relevant raw fields (R, HR, RBI, SB, AVG for
+        hitting; W, SV, SO, ERA, WHIP, IP, ER, BB for pitching).
+
+        Args:
+            season: Season year (e.g. 2026).
+            group: ``"hitting"`` or ``"pitching"``.
+            page_size: Results per page (MLB API caps around 1000).
+            max_pages: Safety cap to prevent runaway pagination.
+
+        Returns:
+            Mapping of ``mlb_player_id -> stat dict`` (camelCase from the API).
+            Empty dict on failure (caller may fall back to per-player queries).
+        """
+        results: dict[int, dict] = {}
+        offset = 0
+        for _ in range(max_pages):
+            data = await self._request(
+                "stats",
+                params={
+                    "stats": "season",
+                    "group": group,
+                    "season": season,
+                    "sportId": 1,
+                    "gameType": "R",
+                    "playerPool": "All",
+                    "limit": page_size,
+                    "offset": offset,
+                },
+                cache_ttl=1800,
+            )
+            if not data:
+                break
+
+            stats_blocks = data.get("stats") or []
+            if not stats_blocks:
+                break
+
+            # /stats returns a list of stat-type blocks; for stats=season there
+            # is one block whose ``splits`` holds the per-player rows.
+            splits = stats_blocks[0].get("splits") or []
+            if not splits:
+                break
+
+            for split in splits:
+                person = split.get("player") or {}
+                pid = person.get("id")
+                stat = split.get("stat") or {}
+                if pid and stat:
+                    results[int(pid)] = stat
+
+            total = stats_blocks[0].get("totalSplits")
+            offset += len(splits)
+            # Stop when we've consumed all rows or the page came back short.
+            if (isinstance(total, int) and offset >= total) or len(splits) < page_size:
+                break
+        else:
+            logger.warning(
+                "Bulk %s stats pagination hit max_pages=%d (offset=%d); result may be truncated",
+                group,
+                max_pages,
+                offset,
+            )
+
+        logger.info("Bulk MLB %s stats: fetched %d players (season=%d)", group, len(results), season)
+        return results
+
     async def get_player_stats(self, player_id: int, season: int, group: str = "hitting") -> dict | None:
         """Get player stats from MLB Stats API.
 

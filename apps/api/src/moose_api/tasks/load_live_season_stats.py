@@ -1,10 +1,23 @@
-"""Load live 2026 season stats from MLB Stats API with Statcast fallback.
+"""Load live season stats from the MLB Stats API.
 
-Fetches season-to-date player statistics primarily from Baseball Savant Statcast API
-(faster bulk data) with fallback to official MLB Stats API. Populates the StatLine
-table for daily z-score computations.
+Populates the ``StatLine`` table with season-to-date hitting and pitching
+statistics for every player in the database. The job is the primary feeder
+for daily z-score / value computations after FanGraphs was retired.
 
-Replaces FanGraphs as the primary source for in-season player statistics.
+Design goals (post-FanGraphs pivot):
+
+* **Fast**: use the league-wide ``/stats?stats=season`` endpoint so the
+  entire league is fetched in 2 paginated calls (hitting + pitching)
+  instead of thousands of per-player round-trips. A full run now takes
+  seconds rather than 3+ hours.
+* **Self-healing**: if the bulk endpoint fails or returns a small set,
+  missing players fall back to per-player ``/people/{id}/stats`` calls,
+  bounded by a hard cap and honoring the shared MLB rate-limit semaphore.
+* **Idempotent**: rows are UPSERTed (``ON CONFLICT (player_id, game_date,
+  source) DO UPDATE``) so a crash mid-run never leaves the table empty,
+  and re-running the job simply refreshes today's values.
+* **Robust**: any failure mode still produces a ``CommissionerNotification``
+  so partial results are observable.
 """
 
 from __future__ import annotations
@@ -12,312 +25,286 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
+import os
 from datetime import date
+from typing import Any
 
-from sqlalchemy import delete, select
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from moose_api.core.database import async_session_factory
 from moose_api.models.notification import CommissionerNotification
 from moose_api.models.player import Player
 from moose_api.models.stats import StatLine
 from moose_api.services.mlb_client import MLBClient
-from moose_api.services.statcast_client import StatcastClient
 
 logger = logging.getLogger(__name__)
 
-
-async def _fetch_player_season_stats(
-    mlb_client: MLBClient,
-    mlb_id: int,
-    season: int,
-    bulk_statcast_data: dict[int, dict] | None,
-) -> tuple[dict | None, bool]:
-    """Fetch season stats for a single player from bulk Statcast or MLB API.
-
-    Prioritizes bulk Statcast data, then MLB Stats API for inactive players.
-
-    Args:
-        mlb_client: MLB client for fallback
-        mlb_id: MLB player ID
-        season: Season year
-        bulk_statcast_data: Pre-fetched bulk Statcast data dictionary
-
-    Returns:
-        Tuple of (stats dict or None, True if bulk data was used)
-    """
-    # Try bulk Statcast data first (fastest)
-    if bulk_statcast_data and mlb_id in bulk_statcast_data:
-        return bulk_statcast_data[mlb_id], True
-
-    # Skip individual Statcast queries - they're slow and only work for active players
-    # Go directly to MLB API for players not in bulk data (inactive players)
-    # Fallback to MLB Stats API
-    try:
-        hitting_data = await mlb_client.get_player_stats(mlb_id, season, "hitting")
-
-        if hitting_data and hitting_data.get("stats"):
-            for stat_entry in hitting_data["stats"]:
-                splits = stat_entry.get("splits", [])
-                if splits:
-                    stats = splits[0].get("stat", {})
-                    if stats:
-                        stats["is_pitcher"] = False
-                        return stats, False
-
-        pitching_data = await mlb_client.get_player_stats(mlb_id, season, "pitching")
-
-        if pitching_data and pitching_data.get("stats"):
-            for stat_entry in pitching_data["stats"]:
-                splits = stat_entry.get("splits", [])
-                if splits:
-                    stats = splits[0].get("stat", {})
-                    if stats:
-                        stats["is_pitcher"] = True
-                        return stats, False
-
-        return None, False
-    except Exception as e:
-        logger.error("Error fetching MLB stats for player %d: %s", mlb_id, e)
-        return None, False
+# Upper bound on how many players we'll attempt to backfill via the slow
+# per-player endpoint when the bulk league feed is missing them. Prevents
+# the tail of inactive/minor-league players from dragging a run out for
+# hours. The bulk feed already covers every player with any 2026 MLB PA.
+MISSING_FALLBACK_MAX = int(os.getenv("LIVE_STATS_FALLBACK_MAX", "300"))
 
 
-def _map_mlb_stats_to_statline(mlb_stats: dict, player_id: int) -> StatLine:
-    """Map MLB Stats API or Statcast response to StatLine model.
+def _num(value: Any) -> float | int | None:
+    """Coerce an MLB Stats API stat value to a clean numeric or None."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (int, float)):
+        if isinstance(value, float) and math.isnan(value):
+            return None
+        return value
+    if isinstance(value, str):
+        try:
+            return float(value) if "." in value else int(value)
+        except ValueError:
+            return None
+    return None
 
-    Supports both MLB API camelCase (e.g., 'strikeOuts') and Statcast
-    snake_case (e.g., 'strikeouts') field naming conventions.
 
-    Args:
-        mlb_stats: Stats dict from MLB API or Statcast
-        player_id: Database player ID
+def _build_hitting_row(player_id: int, stat: dict, today: date) -> dict:
+    return {
+        "player_id": player_id,
+        "game_date": today,
+        "source": "mlb_api",
+        "is_pitcher": False,
+        "runs": _num(stat.get("runs")) or 0,
+        "home_runs": _num(stat.get("homeRuns")) or 0,
+        "rbi": _num(stat.get("rbi")) or 0,
+        "stolen_bases": _num(stat.get("stolenBases")) or 0,
+        "hits": _num(stat.get("hits")) or 0,
+        "at_bats": _num(stat.get("atBats")) or 0,
+        "batting_avg": _num(stat.get("avg")),
+        "wins": 0,
+        "saves": 0,
+        "strikeouts": _num(stat.get("strikeOuts")) or 0,
+        "innings_pitched": 0,
+        "earned_runs": 0,
+        "walks": _num(stat.get("baseOnBalls")) or 0,
+        "era": None,
+        "whip": None,
+    }
 
-    Returns:
-        StatLine instance
-    """
-    is_pitcher = mlb_stats.get("is_pitcher", False)
 
-    def get_stat(field_camel: str, field_snake: str, default=0):
-        for field in (field_camel, field_snake):
-            if field in mlb_stats:
-                val = mlb_stats[field]
-                if val is None or val == "":
-                    continue
-                if isinstance(val, (int, float)):
-                    # Check for NaN values
-                    if isinstance(val, float) and math.isnan(val):
-                        continue
-                    return val
-                if isinstance(val, str):
-                    try:
-                        # Try converting to int first, then float for decimal stats
-                        if "." in val:
-                            return float(val)
-                        else:
-                            return int(val)
-                    except (ValueError, TypeError):
-                        continue
-        return default
+def _build_pitching_row(player_id: int, stat: dict, today: date) -> dict:
+    return {
+        "player_id": player_id,
+        "game_date": today,
+        "source": "mlb_api",
+        "is_pitcher": True,
+        "runs": 0,
+        "home_runs": 0,
+        "rbi": 0,
+        "stolen_bases": 0,
+        "hits": 0,
+        "at_bats": 0,
+        "batting_avg": None,
+        "wins": _num(stat.get("wins")) or 0,
+        "saves": _num(stat.get("saves")) or 0,
+        "strikeouts": _num(stat.get("strikeOuts")) or 0,
+        "innings_pitched": _num(stat.get("inningsPitched")) or 0,
+        "earned_runs": _num(stat.get("earnedRuns")) or 0,
+        "walks": _num(stat.get("baseOnBalls")) or 0,
+        "era": _num(stat.get("era")),
+        "whip": _num(stat.get("whip")),
+    }
 
-    if is_pitcher:
-        return StatLine(
-            player_id=player_id,
-            game_date=date.today(),
-            source="mlb_api",
-            is_pitcher=True,
-            runs=0,
-            home_runs=0,
-            rbi=0,
-            stolen_bases=0,
-            hits=0,
-            at_bats=0,
-            batting_avg=None,
-            wins=get_stat("wins", "wins"),
-            saves=get_stat("saves", "saves"),
-            strikeouts=get_stat("strikeOuts", "strikeouts"),
-            innings_pitched=get_stat("inningsPitched", "innings_pitched"),
-            earned_runs=get_stat("earnedRuns", "earned_runs"),
-            walks=get_stat("baseOnBalls", "walks"),
-            era=get_stat("era", "era", default=None),
-            whip=get_stat("whip", "whip", default=None),
-        )
-    else:
-        return StatLine(
-            player_id=player_id,
-            game_date=date.today(),
-            source="mlb_api",
-            is_pitcher=False,
-            runs=get_stat("runs", "runs"),
-            home_runs=get_stat("homeRuns", "home_runs"),
-            rbi=get_stat("rbi", "rbi"),
-            stolen_bases=get_stat("stolenBases", "stolen_bases"),
-            hits=get_stat("hits", "hits"),
-            at_bats=get_stat("atBats", "at_bats"),
-            batting_avg=get_stat("avg", "avg", default=None),
-            wins=0,
-            saves=0,
-            strikeouts=get_stat("strikeOuts", "strikeouts"),
-            innings_pitched=0,
-            earned_runs=0,
-            walks=get_stat("baseOnBalls", "walks"),
-            era=None,
-            whip=None,
-        )
+
+def _row_for_player(
+    player: Player,
+    hitting: dict[int, dict],
+    pitching: dict[int, dict],
+    today: date,
+) -> dict | None:
+    """Pick the best bulk stat line for a player, or None if absent."""
+    mlb_id = player.mlb_id
+    if not mlb_id:
+        return None
+
+    in_pitch = mlb_id in pitching
+    in_hit = mlb_id in hitting
+
+    # Two-way / ambiguous: honor the roster flag first, then whichever
+    # bulk feed actually has this player.
+    if player.is_pitcher and in_pitch:
+        return _build_pitching_row(player.id, pitching[mlb_id], today)
+    if in_hit:
+        return _build_hitting_row(player.id, hitting[mlb_id], today)
+    if in_pitch:
+        return _build_pitching_row(player.id, pitching[mlb_id], today)
+    return None
+
+
+async def _fetch_player_fallback(mlb_client: MLBClient, player: Player, season: int, today: date) -> dict | None:
+    """Per-player fallback when bulk feeds don't contain this player."""
+    if not player.mlb_id:
+        return None
+
+    # Preferred group first to minimize the common case to one API call.
+    groups = ("pitching", "hitting") if player.is_pitcher else ("hitting", "pitching")
+
+    for group in groups:
+        try:
+            payload = await mlb_client.get_player_stats(player.mlb_id, season, group)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug(
+                "Per-player %s stats failed for %s (mlb_id=%s): %s",
+                group,
+                player.name,
+                player.mlb_id,
+                exc,
+            )
+            continue
+
+        if not payload:
+            continue
+        for stat_entry in payload.get("stats", []) or []:
+            splits = stat_entry.get("splits") or []
+            if not splits:
+                continue
+            stat = splits[0].get("stat") or {}
+            if not stat:
+                continue
+            if group == "pitching":
+                return _build_pitching_row(player.id, stat, today)
+            return _build_hitting_row(player.id, stat, today)
+
+    return None
 
 
 async def run_load_live_season_stats():
-    """Load live season stats from MLB Stats API for all players.
-
-    This task fetches current season-to-date statistics primarily from
-    Baseball Savant Statcast API (faster) with fallback to official
-    MLB Stats API. Populates the StatLine table for daily z-score computations.
-
-    Uses concurrent fetching with rate limiting for efficiency.
-    """
-    mlb_client = None
-    statcast_client = None
+    """Entrypoint for the ``load_live_season_stats_job`` arq task."""
+    mlb_client: MLBClient | None = None
     try:
-        # Initialize Statcast client (may fail if pybaseball not installed)
-        try:
-            statcast_client = StatcastClient()
-            logger.info("Statcast client initialized successfully")
-        except ImportError:
-            logger.warning("Statcast client unavailable, using MLB Stats API only")
-            statcast_client = None
-
         mlb_client = MLBClient()
         season = date.today().year
+        today = date.today()
 
-        # Fetch bulk Statcast data once if available
-        bulk_statcast_data = None
-        if statcast_client:
-            try:
-                start_dt = f"{season}-03-01"
-                end_dt = f"{season}-12-31"
-                logger.info("Fetching bulk Statcast data for season %d", season)
+        # --- 1. Bulk league-wide fetch (two parallel paginated requests) ---
+        logger.info("Fetching bulk season stats from MLB Stats API (season=%d)", season)
+        hitting_task = asyncio.create_task(mlb_client.get_bulk_season_stats(season, "hitting"))
+        pitching_task = asyncio.create_task(mlb_client.get_bulk_season_stats(season, "pitching"))
+        hitting_bulk, pitching_bulk = await asyncio.gather(hitting_task, pitching_task, return_exceptions=False)
+        logger.info(
+            "Bulk fetch done: %d hitters, %d pitchers",
+            len(hitting_bulk),
+            len(pitching_bulk),
+        )
 
-                # Fetch both hitting and pitching data
-                hitting_data = await statcast_client.fetch_bulk_stats(start_dt, end_dt, "hitting")
-                pitching_data = await statcast_client.fetch_bulk_stats(start_dt, end_dt, "pitching")
-
-                # Merge the data (handle players who appear in both)
-                bulk_statcast_data = {}
-                for player_id, stats in hitting_data.items():
-                    bulk_statcast_data[player_id] = stats
-                for player_id, stats in pitching_data.items():
-                    # If player already exists (two-way player), keep the pitcher role
-                    bulk_statcast_data[player_id] = stats
-
-                logger.info(
-                    "Fetched Statcast data for %d players (%d hitting, %d pitching)",
-                    len(bulk_statcast_data),
-                    len(hitting_data),
-                    len(pitching_data),
-                )
-            except Exception as e:
-                logger.warning("Bulk Statcast fetch failed, falling back to individual queries: %s", e)
-                bulk_statcast_data = None
-
+        # --- 2. Load roster & assemble rows ---
         async with async_session_factory() as session:
             players_result = await session.execute(select(Player).where(Player.mlb_id.isnot(None)))
-            players = players_result.scalars().all()
+            players = list(players_result.scalars().all())
 
             if not players:
-                logger.warning("No players with MLB IDs found")
+                logger.warning("No players with MLB IDs found; nothing to sync")
                 return
 
-            logger.info("Loading live season stats for %d players (season %d)", len(players), season)
+            rows: list[dict] = []
+            missing: list[Player] = []
+            for p in players:
+                row = _row_for_player(p, hitting_bulk, pitching_bulk, today)
+                if row is not None:
+                    rows.append(row)
+                else:
+                    missing.append(p)
 
-            today = date.today()
-            delete_result = await session.execute(
-                delete(StatLine).where(
-                    StatLine.game_date == today,
-                    StatLine.source == "mlb_api",
-                )
+            bulk_hits = len(rows)
+            logger.info(
+                "Bulk-matched %d/%d players; %d candidates for per-player fallback",
+                bulk_hits,
+                len(players),
+                len(missing),
             )
-            logger.info("Deleted %d existing StatLine entries for today", delete_result.rowcount)
+
+            # --- 3. Bounded fallback for players missing from bulk feeds ---
+            # The shared MLB_API_MAX_CONCURRENCY semaphore inside MLBClient
+            # already caps real in-flight requests; no extra gather limit needed.
+            #
+            # Only skip fallback on a *total* bulk outage (both feeds empty).
+            # If just one feed failed, we still want to backfill the affected
+            # class of players (e.g. all pitchers when pitching_bulk is empty)
+            # via per-player queries rather than silently dropping them.
+            fallback_hits = 0
+            total_outage = not hitting_bulk and not pitching_bulk
+            if missing and total_outage:
+                logger.warning(
+                    "Both bulk feeds empty; skipping per-player fallback for %d players to avoid long runtime",
+                    len(missing),
+                )
+            elif missing:
+                if not hitting_bulk or not pitching_bulk:
+                    logger.warning(
+                        "Partial bulk outage (hitting=%d, pitching=%d); backfilling via per-player fallback",
+                        len(hitting_bulk),
+                        len(pitching_bulk),
+                    )
+                capped = missing[:MISSING_FALLBACK_MAX]
+                if len(missing) > MISSING_FALLBACK_MAX:
+                    logger.info(
+                        "Capping fallback at %d of %d missing players (env LIVE_STATS_FALLBACK_MAX)",
+                        MISSING_FALLBACK_MAX,
+                        len(missing),
+                    )
+                fallback_results = await asyncio.gather(
+                    *(_fetch_player_fallback(mlb_client, p, season, today) for p in capped),
+                    return_exceptions=False,
+                )
+                for row in fallback_results:
+                    if row is not None:
+                        rows.append(row)
+                        fallback_hits += 1
+
+            # --- 4. Idempotent upsert of today's rows ---
+            if rows:
+                stmt = pg_insert(StatLine).values(rows)
+                update_cols = {
+                    c.name: stmt.excluded[c.name]
+                    for c in StatLine.__table__.columns
+                    if c.name not in ("id", "player_id", "game_date", "source")
+                }
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=["player_id", "game_date", "source"],
+                    set_=update_cols,
+                )
+                await session.execute(stmt)
+                await session.commit()
 
             total = len(players)
-            inserted_count = 0
-            failed_count = 0
-            bulk_hit_count = 0
-            individual_fallback_count = 0
-            log_interval = max(1, total // 10)
-
-            async def fetch_and_store(player: Player):
-                nonlocal inserted_count, failed_count, bulk_hit_count, individual_fallback_count
-                try:
-                    if not player.mlb_id:
-                        return (player.id, None, None, None)
-                    mlb_stats, used_bulk = await _fetch_player_season_stats(
-                        mlb_client, player.mlb_id, season, bulk_statcast_data
-                    )
-                    if used_bulk:
-                        bulk_hit_count += 1
-                    else:
-                        individual_fallback_count += 1
-                    if mlb_stats:
-                        statline = _map_mlb_stats_to_statline(mlb_stats, player.id)
-                        return (player.id, statline, None, None)
-                    else:
-                        failed_count += 1
-                        return (player.id, None, None, None)
-                except Exception as e:
-                    return (player.id, None, e, str(e))
-
-            tasks = [fetch_and_store(player) for player in players]
-            results = await asyncio.gather(*tasks)
-
-            for i, result in enumerate(results, 1):
-                player_id, statline, error, error_msg = result
-                if error:
-                    logger.warning("Error fetching stats for player ID %d: %s", player_id, error_msg)
-                    failed_count += 1
-                elif statline:
-                    session.add(statline)
-                    inserted_count += 1
-                if i % log_interval == 0 or i == total:
-                    logger.info(
-                        "Progress: %d/%d players processed (%.1f%%), %d inserted, %d failed",
-                        i,
-                        total,
-                        (i / total) * 100,
-                        inserted_count,
-                        failed_count,
-                    )
-
-            await session.commit()
-
+            no_data = total - len(rows)
             logger.info(
-                "Live season stats load complete: %d inserted, %d failed, %d from bulk, %d from fallback (%.1f%% bulk hit rate)",
-                inserted_count,
-                failed_count,
-                bulk_hit_count,
-                individual_fallback_count,
-                (bulk_hit_count / total * 100) if total > 0 else 0,
+                "Live season stats upserted: %d rows (%d bulk, %d fallback, %d without data) / %d players",
+                len(rows),
+                bulk_hits,
+                fallback_hits,
+                no_data,
+                total,
             )
 
             notif = CommissionerNotification(
                 type="info",
                 message=(
-                    f"Live season stats loaded: {inserted_count} players updated, "
-                    f"{failed_count} players had no data (season {season})"
+                    f"Live season stats loaded: {len(rows)} rows upserted "
+                    f"({bulk_hits} bulk + {fallback_hits} fallback) for "
+                    f"{total} players, {no_data} without data (season {season})"
                 ),
             )
             session.add(notif)
             await session.commit()
 
-    except Exception as e:
-        logger.error("load_live_season_stats failed: %s", e)
+    except Exception as exc:
+        logger.error("load_live_season_stats failed: %s", exc, exc_info=True)
         async with async_session_factory() as session:
             notif = CommissionerNotification(
                 type="sync_failure",
-                message=f"Live season stats load failed: {e}",
+                message=f"Live season stats load failed: {str(exc)[:500]}",
             )
             session.add(notif)
             await session.commit()
         raise
     finally:
-        if statcast_client:
-            await statcast_client.close()
         if mlb_client:
             await mlb_client.close()
