@@ -6,10 +6,10 @@
   and configuration management. Requires commissioner role.
 -->
 <script lang="ts">
+  import { navigate } from "astro:transitions/client";
   import { onMount } from "svelte";
   import { api } from "../lib/api";
   import { fetchUser, getUser } from "../lib/stores.svelte";
-  import { navigate } from "astro:transitions/client";
 
   let {
     section = "overview",
@@ -528,17 +528,17 @@
           {/if}
         </div>
         <div class="flex flex-wrap gap-2">
-          <button onclick={refreshJobStatus} class="btn btn-secondary text-xs">
+          <button type="button" onclick={refreshJobStatus} class="btn btn-secondary text-xs">
             REFRESH JOB STATUS
           </button>
-          <button
+          <button type="button"
             onclick={() => issueJobStop("stop")}
             disabled={overview?.job_stop_active || jobStopAction !== null}
             class="btn btn-danger text-xs"
           >
             ISSUE HARD STOP
           </button>
-          <button
+          <button type="button"
             onclick={() => issueJobStop("resume")}
             disabled={!overview?.job_stop_active || jobStopAction !== null}
             class="btn btn-success text-xs"
@@ -572,7 +572,7 @@
                   statusData?.status === "processing" || isSyncing}
                 {@const isDanger = group.title.includes("DANGER")}
                 {@const statusInfo = jobStatusLabel(statusData, isSyncing)}
-                <button
+                <button type="button"
                   onclick={() => triggerSync(job.name)}
                   disabled={isProcessing}
                   class="group flex flex-col items-start justify-between bg-(--color-surface) px-4 py-4 font-mono text-[10px] font-black uppercase tracking-widest transition hover:bg-(--color-surface-raised) border-l-4 {isDanger
@@ -646,7 +646,7 @@
           {/if}
         </div>
         {#if activeNotifications.length > 0}
-          <button onclick={markAllRead} class="btn btn-secondary text-xs">
+          <button type="button" onclick={markAllRead} class="btn btn-secondary text-xs">
             CLEAR ALL
           </button>
         {/if}
@@ -689,7 +689,7 @@
                   > {notif.message}
                 </p>
               </div>
-              <button
+              <button type="button"
                 onclick={() => markRead(notif.id)}
                 class="btn btn-secondary text-xs shrink-0"
               >
@@ -721,7 +721,7 @@
         </div>
         {#if clearedTotalPages > 1}
           <div class="flex items-center gap-2">
-            <button
+            <button type="button"
               onclick={() => (clearedPage = Math.max(0, clearedPage - 1))}
               disabled={clearedPage === 0}
               class="btn btn-secondary px-3 py-1 text-xs"
@@ -733,7 +733,7 @@
             >
               {clearedPage + 1} / {clearedTotalPages}
             </span>
-            <button
+            <button type="button"
               onclick={() =>
                 (clearedPage = Math.min(
                   clearedTotalPages - 1,

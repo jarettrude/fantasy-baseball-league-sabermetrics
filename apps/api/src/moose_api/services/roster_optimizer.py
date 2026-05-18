@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from datetime import date, timedelta
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -86,6 +87,7 @@ class PlayerLite:
     team_abbr: str | None
     is_pitcher: bool
     injury_status: str | None
+    mlb_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -98,6 +100,8 @@ class ValuedPlayer:
     yahoo_rank: int | None
     next_games_value: Decimal | None
     roster_slot: str | None = None
+    roster_percent: float | None = None
+    roster_trend: float | None = None
 
 
 @dataclass
@@ -136,6 +140,15 @@ class DropCandidate:
 
 
 @dataclass
+class ILStashCandidate:
+    """High-value injured free agent returning soon — worth stashing."""
+
+    player: ValuedPlayer
+    expected_return_date: str
+    days_until_return: int
+
+
+@dataclass
 class RosterRecommendations:
     """Position-aligned drop/pickup plan for one fantasy team."""
 
@@ -145,6 +158,8 @@ class RosterRecommendations:
     drop_candidates: list[DropCandidate]
     upgrades_by_position: dict[str, PositionUpgrade]
     top_fa_overall: list[ValuedPlayer]
+    category_weaknesses: list[dict] = field(default_factory=list)
+    il_stash_candidates: list[ILStashCandidate] = field(default_factory=list)
 
 
 def _required_starter_positions(roster_positions: list[dict]) -> set[str]:
@@ -186,6 +201,7 @@ def _to_lite(player: Player) -> PlayerLite:
         team_abbr=player.team_abbr,
         is_pitcher=player.is_pitcher,
         injury_status=player.injury_status,
+        mlb_id=player.mlb_id,
     )
 
 
@@ -249,6 +265,8 @@ def _valued(
             Decimal(next_snap.composite_value) if next_snap is not None else None
         ),
         roster_slot=roster_slot,
+        roster_percent=float(season_snap.roster_percent) if season_snap.roster_percent is not None else None,
+        roster_trend=float(season_snap.roster_trend) if season_snap.roster_trend is not None else None,
     )
 
 
@@ -387,6 +405,61 @@ async def build_recommendations(
 
     top_fa_overall = fa_valued[:TOP_FA_OVERALL]
 
+    # --- Category weakness analysis ---
+    category_weaknesses: list[dict] = []
+    if league and league.stat_categories:
+        cat_names = [
+            c.get("display_name")
+            for c in league.stat_categories
+            if c.get("display_name") and not c.get("is_only_display_stat")
+        ]
+        cat_names = [c for c in cat_names if c]
+
+        cat_totals: dict[str, list[float]] = {cat: [] for cat in cat_names}
+        for vp in starter_valued:
+            snap = season_map.get(vp.player.id)
+            if snap and snap.category_scores:
+                for cat in cat_names:
+                    score = snap.category_scores.get(cat)
+                    if score is not None:
+                        cat_totals[cat].append(float(score))
+
+        cat_avgs = []
+        for cat, scores in cat_totals.items():
+            if scores:
+                avg = sum(scores) / len(scores)
+                cat_avgs.append({"category": cat, "team_avg_zscore": round(avg, 3)})
+
+        cat_avgs.sort(key=lambda x: x["team_avg_zscore"])
+        category_weaknesses = cat_avgs[:3]
+
+    # --- IL stash candidates ---
+    il_stash_candidates: list[ILStashCandidate] = []
+    today = date.today()
+    stash_cutoff = today + timedelta(days=14)
+
+    for player in fa_players:
+        if not player.expected_return_date:
+            continue
+        if player.expected_return_date > stash_cutoff:
+            continue
+        if player.injury_status and player.injury_status.upper() in ("IL60", "OUT", "SUSP"):
+            continue
+
+        vp = _valued(player, season_map.get(player.id), next_map.get(player.id))
+        if vp and vp.composite_value > Decimal("0.0"):
+            days_left = max(0, (player.expected_return_date - today).days)
+            il_stash_candidates.append(
+                ILStashCandidate(
+                    player=vp,
+                    expected_return_date=str(player.expected_return_date),
+                    days_until_return=days_left,
+                )
+            )
+
+    il_stash_candidates.sort(key=lambda x: float(x.player.composite_value), reverse=True)
+    il_stash_candidates = il_stash_candidates[:3]
+
     return RosterRecommendations(
         team_id=team.id,
         team_name=team.name,
@@ -394,6 +467,8 @@ async def build_recommendations(
         drop_candidates=drops,
         upgrades_by_position=upgrades_by_position,
         top_fa_overall=top_fa_overall,
+        category_weaknesses=category_weaknesses,
+        il_stash_candidates=il_stash_candidates,
     )
 
 
@@ -408,7 +483,7 @@ def recommendations_to_prompt_payload(rec: RosterRecommendations) -> dict:
     def _vp(vp: ValuedPlayer | None) -> dict | None:
         if vp is None:
             return None
-        return {
+        d = {
             "id": vp.player.id,
             "name": vp.player.name,
             "primary_position": vp.player.primary_position,
@@ -422,6 +497,13 @@ def recommendations_to_prompt_payload(rec: RosterRecommendations) -> dict:
             "yahoo_rank": vp.yahoo_rank,
             "roster_slot": vp.roster_slot,
         }
+        if vp.roster_percent is not None:
+            d["roster_percent"] = vp.roster_percent
+        if vp.roster_trend is not None:
+            d["roster_trend"] = vp.roster_trend
+        if vp.player.mlb_id is not None:
+            d["mlb_id"] = vp.player.mlb_id
+        return d
 
     return {
         "team_name": rec.team_name,
@@ -446,4 +528,13 @@ def recommendations_to_prompt_payload(rec: RosterRecommendations) -> dict:
             for pos, up in rec.upgrades_by_position.items()
         },
         "top_fa_overall": [_vp(vp) for vp in rec.top_fa_overall],
+        "category_weaknesses": rec.category_weaknesses,
+        "il_stash_candidates": [
+            {
+                "player": _vp(s.player),
+                "expected_return_date": s.expected_return_date,
+                "days_until_return": s.days_until_return,
+            }
+            for s in rec.il_stash_candidates
+        ],
     }

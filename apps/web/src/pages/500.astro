@@ -1,4 +1,7 @@
 ---
+
+
+
 import BaseLayout from "../layouts/BaseLayout.astro";
 
 // Astro 4.10+ and 5.0+ provide error info in SSR mode if 500.astro is present
@@ -35,7 +38,7 @@ if (error) {
           <div
             class="flex h-14 w-14 items-center justify-center rounded-full bg-(--color-danger-muted) border border-(--color-danger)"
           >
-            <svg
+            <svg aria-hidden="true"
               class="h-7 w-7 text-(--color-danger)"
               fill="none"
               stroke="currentColor"
@@ -75,7 +78,7 @@ if (error) {
         </div>
 
         <div class="flex flex-col sm:flex-row gap-3 justify-center">
-          <button onclick="window.location.reload()" class="btn btn-primary">
+          <button type="button" onclick="window.location.reload()" class="btn btn-primary">
             RE-CALIBRATE // REFRESH
           </button>
           <a href="/" class="btn btn-secondary"> EXIT TO HUB </a>

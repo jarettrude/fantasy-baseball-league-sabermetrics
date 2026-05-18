@@ -28,7 +28,7 @@ class BatchQuotaState:
     """
 
     def __init__(self):
-        self.gemini_3_1_lite_exhausted = False
+        self.gemini_3_1_flash_lite_exhausted = False
 
 
 batch_quota = BatchQuotaState()
@@ -40,7 +40,7 @@ def reset_batch_quota_state():
     Called at the start of new batch jobs to ensure fresh quota state
     and allow retry of previously exhausted providers.
     """
-    batch_quota.gemini_3_1_lite_exhausted = False
+    batch_quota.gemini_3_1_flash_lite_exhausted = False
 
 
 def is_daily_quota_exhausted(e: Exception) -> bool:
@@ -100,7 +100,7 @@ class LLMError(Exception):
 
 
 async def _call_gemini(
-    prompt: str, system_prompt: str = "", model: str = "gemini-3.1-flash-lite-preview"
+    prompt: str, system_prompt: str = "", model: str = "gemini-3.1-flash-lite"
 ) -> LLMResponse:
     full_prompt = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
     url = GEMINI_API_BASE.format(model=model)
@@ -153,7 +153,7 @@ async def _call_openrouter(prompt: str, system_prompt: str = "") -> LLMResponse:
                 "Content-Type": "application/json",
             },
             json={
-                "model": "google/gemini-3.1-flash-lite-preview",
+                "model": "google/gemini-3.1-flash-lite",
                 "messages": messages,
                 "temperature": 0.8,
                 "max_tokens": 2048,
@@ -174,7 +174,7 @@ async def _call_openrouter(prompt: str, system_prompt: str = "") -> LLMResponse:
     return LLMResponse(
         content=content,
         provider="openrouter",
-        model="google/gemini-3.1-flash-lite-preview",
+        model="google/gemini-3.1-flash-lite",
         input_tokens=usage.get("prompt_tokens", 0),
         output_tokens=usage.get("completion_tokens", 0),
     )
@@ -183,18 +183,18 @@ async def _call_openrouter(prompt: str, system_prompt: str = "") -> LLMResponse:
 async def generate_text(prompt: str, system_prompt: str = "") -> LLMResponse:
     last_error = None
 
-    if not batch_quota.gemini_3_1_lite_exhausted:
+    if not batch_quota.gemini_3_1_flash_lite_exhausted:
         for attempt in range(2):
             try:
-                logger.info("Attempting LLM generation with gemini-3.1-flash-lite-preview...")
-                return await _call_gemini(prompt, system_prompt, model="gemini-3.1-flash-lite-preview")
+                logger.info("Attempting LLM generation with gemini-3.1-flash-lite...")
+                return await _call_gemini(prompt, system_prompt, model="gemini-3.1-flash-lite")
             except LLMError as e:
                 last_error = e
                 if is_daily_quota_exhausted(e) or str(e).find("RESOURCE_EXHAUSTED") != -1:
-                    batch_quota.gemini_3_1_lite_exhausted = True
-                    logger.warning("gemini-3.1-flash-lite-preview quota exhausted. Skipping for rest of batch.")
+                    batch_quota.gemini_3_1_flash_lite_exhausted = True
+                    logger.warning("gemini-3.1-flash-lite quota exhausted. Skipping for rest of batch.")
                     break
-                logger.warning("gemini-3.1-flash-lite-preview attempt %d failed: %s", attempt + 1, e)
+                logger.warning("gemini-3.1-flash-lite attempt %d failed: %s", attempt + 1, e)
                 if attempt < 1:
                     await asyncio.sleep(2**attempt)
 

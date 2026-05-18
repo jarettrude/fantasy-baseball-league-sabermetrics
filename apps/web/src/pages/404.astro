@@ -1,5 +1,9 @@
 ---
+
+
+
 export const prerender = false;
+
 import BaseLayout from "../layouts/BaseLayout.astro";
 
 const title = "404 // Route Not Found";
@@ -24,7 +28,7 @@ const code = "404";
           <div
             class="flex h-14 w-14 items-center justify-center rounded-full bg-(--color-warning-muted) border border-(--color-warning)"
           >
-            <svg
+            <svg aria-hidden="true"
               class="h-7 w-7 text-(--color-warning)"
               fill="none"
               stroke="currentColor"

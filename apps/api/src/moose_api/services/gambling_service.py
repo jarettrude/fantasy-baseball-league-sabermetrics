@@ -49,7 +49,7 @@ class GamblingService:
         "St. Louis Cardinals": "STL",
         "Tampa Bay Rays": "TB",
         "Texas Rangers": "TEX",
-        "Toronto Blue Blue Jays": "TOR",
+        "Toronto Blue Jays": "TOR",
         "Washington Nationals": "WSH",
     }
 

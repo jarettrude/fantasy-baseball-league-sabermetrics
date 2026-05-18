@@ -52,7 +52,7 @@
       </div>
 
       <!-- Theme toggle -->
-      <button
+      <button type="button"
         onclick={toggleTheme}
         aria-label="Toggle {isDark ? 'light' : 'dark'} theme"
         class="flex items-center gap-2 font-mono text-xs text-(--color-text-muted) hover:text-(--color-text) cursor-pointer"

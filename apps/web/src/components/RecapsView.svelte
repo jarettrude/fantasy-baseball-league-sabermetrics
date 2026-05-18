@@ -5,10 +5,10 @@
   Supports filtering by week and recap type with markdown rendering.
 -->
 <script lang="ts">
+  import { navigate } from "astro:transitions/client";
   import { onMount } from "svelte";
   import { api } from "../lib/api";
   import { fetchUser, getUser } from "../lib/stores.svelte";
-  import { navigate } from "astro:transitions/client";
 
   let recapsData: any = $state(null);
   let loading = $state(true);
@@ -23,19 +23,26 @@
       return;
     }
 
+    await loadHistory();
+    await loadRecaps();
+  });
+
+  async function loadHistory() {
     try {
-      history = await api.get("/recaps/history");
+      const historyResponse = await api.get<number[]>("/recaps/history");
+      history = historyResponse;
       if (history.length > 0) {
         selectedWeek = history[0];
       } else {
-        const league: any = await api.get("/league/info");
+        const league = await api.get<{ current_week: number }>("/league/info");
         selectedWeek = Math.max(1, (league.current_week || 2) - 1);
       }
-    } catch {
-      // fallback
+    } catch (e: unknown) {
+      error = e instanceof Error ? e.message : String(e);
+    } finally {
+      loading = false;
     }
-    await loadRecaps();
-  });
+  }
 
   /**
    * Fetches artificial intelligence week recaps for the current logged-in manager context.
@@ -159,7 +166,7 @@
       <!-- Compact Grid Layout for many weeks -->
       <div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-3 gap-1.5">
         {#each history as week}
-          <button
+          <button type="button"
             onclick={() => loadRecaps(week)}
             class="aspect-square flex flex-col items-center justify-center font-mono transition-all duration-200 group border-2
             {selectedWeek === week

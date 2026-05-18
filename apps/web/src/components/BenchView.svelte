@@ -6,10 +6,10 @@
   player value trend information.
 -->
 <script lang="ts">
+  import { navigate } from "astro:transitions/client";
   import { onMount } from "svelte";
   import { api } from "../lib/api";
   import { fetchUser, getUser } from "../lib/stores.svelte";
-  import { navigate } from "astro:transitions/client";
 
   let data: any = $state(null);
   let recommendations: any = $state(null);
@@ -460,7 +460,7 @@
         <thead>
           <tr class="border-b border-(--color-border)">
             <th class="px-3 py-2.5 text-left">
-              <button
+              <button type="button"
                 onclick={() => sort("name")}
                 class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-text-muted) hover:text-(--color-text) cursor-pointer whitespace-nowrap"
                 title="Player Name"
@@ -469,7 +469,7 @@
               </button>
             </th>
             <th class="px-2 py-2.5 text-center">
-              <button
+              <button type="button"
                 onclick={() => sort("position")}
                 class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-text-muted) hover:text-(--color-text) cursor-pointer"
                 title="Player's Primary Position"
@@ -478,7 +478,7 @@
               </button>
             </th>
             <th class="px-2 py-2.5 text-center hidden md:table-cell">
-              <button
+              <button type="button"
                 onclick={() => sort("team")}
                 class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-text-muted) hover:text-(--color-text) cursor-pointer"
                 title="MLB Team Abbreviation"
@@ -487,7 +487,7 @@
               </button>
             </th>
             <th class="px-2 py-2.5 text-center hidden lg:table-cell">
-              <button
+              <button type="button"
                 onclick={() => sort("y_rank")}
                 class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-text-muted) hover:text-(--color-text) cursor-pointer"
                 title="Official Yahoo Fantasy Rank based on season-to-date stats"
@@ -496,7 +496,7 @@
               </button>
             </th>
             <th class="px-2 py-2.5 text-center hidden lg:table-cell">
-              <button
+              <button type="button"
                 onclick={() => sort("our_rank")}
                 class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-text-muted) hover:text-(--color-text) cursor-pointer"
                 title="Internal Moose ranking based on customized z-score valuation"
@@ -505,7 +505,7 @@
               </button>
             </th>
             <th class="px-2 py-2.5 text-center hidden xl:table-cell">
-              <button
+              <button type="button"
                 onclick={() => sort("roster_percent")}
                 class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-text-muted) hover:text-(--color-text) cursor-pointer"
                 title="Yahoo Roster Percentage & 3-Day Trend"
@@ -514,7 +514,7 @@
               </button>
             </th>
             <th class="px-2 py-2.5 text-center hidden xl:table-cell">
-              <button
+              <button type="button"
                 onclick={() => sort("xstat")}
                 class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-text-muted) hover:text-(--color-text) cursor-pointer"
                 title="Expected stats (xwOBA for Hitters, xERA for Pitchers)"
@@ -528,7 +528,7 @@
               >Slot</th
             >
             <th class="px-2 py-2.5 text-center">
-              <button
+              <button type="button"
                 onclick={() => sort("season_value")}
                 class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-text-muted) hover:text-(--color-text) cursor-pointer"
                 title="Aggregate value mathematically calculated over the entire season"
@@ -537,7 +537,7 @@
               </button>
             </th>
             <th class="px-2 py-2.5 text-center hidden sm:table-cell">
-              <button
+              <button type="button"
                 onclick={() => sort("next_value")}
                 class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-text-muted) hover:text-(--color-text) cursor-pointer"
                 title="Forecasted value over the next 7 days. Adjusted for missed games, 2-start pitchers, and Vegas Implied Win Odds (Matchups)."

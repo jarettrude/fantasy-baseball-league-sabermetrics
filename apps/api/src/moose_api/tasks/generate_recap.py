@@ -97,6 +97,96 @@ async def _generate_one_recap(
         )
 
 
+def _compute_standings_from_matchups(matchups_list, teams_dict):
+    """Compute win/loss/tie standings from a set of matchups."""
+    records = {tid: {"wins": 0, "losses": 0, "ties": 0} for tid in teams_dict}
+    for m in matchups_list:
+        if m.team_a_wins > m.team_b_wins:
+            if m.team_a_id in records:
+                records[m.team_a_id]["wins"] += 1
+            if m.team_b_id in records:
+                records[m.team_b_id]["losses"] += 1
+        elif m.team_b_wins > m.team_a_wins:
+            if m.team_b_id in records:
+                records[m.team_b_id]["wins"] += 1
+            if m.team_a_id in records:
+                records[m.team_a_id]["losses"] += 1
+        else:
+            if m.team_a_id in records:
+                records[m.team_a_id]["ties"] += 1
+            if m.team_b_id in records:
+                records[m.team_b_id]["ties"] += 1
+
+    sorted_teams = sorted(
+        teams_dict.values(),
+        key=lambda t: (
+            -records[t.id]["wins"],
+            records[t.id]["losses"],
+            -records[t.id]["ties"],
+        ),
+    )
+    standings = []
+    for rank, team in enumerate(sorted_teams, 1):
+        rec = records[team.id]
+        standings.append(
+            {
+                "team": team.name,
+                "wins": rec["wins"],
+                "losses": rec["losses"],
+                "ties": rec["ties"],
+                "standing": rank,
+            }
+        )
+    return standings
+
+
+async def _detect_roster_blunders(session, teams_dict, recap_week):
+    """Find players started in active lineup slots while on the IL."""
+    blunders = []
+    # Active lineup slots — anything that isn't bench or IL is a start slot
+    bench_slots = {"BN", "IL", "IL+", "NA", "DL", "DL+"}
+
+    for team_id, team in teams_dict.items():
+        roster_result = await session.execute(
+            select(RosterSlot).where(
+                RosterSlot.team_id == team_id,
+                RosterSlot.week == recap_week,
+                RosterSlot.is_active.is_(True),
+            )
+        )
+        slots = roster_result.scalars().all()
+
+        for slot in slots:
+            if slot.position in bench_slots:
+                continue
+
+            player_result = await session.execute(
+                select(Player).where(Player.id == slot.player_id)
+            )
+            player = player_result.scalar_one_or_none()
+            if not player:
+                continue
+
+            # Flag players with IL/DTD/Out/Suspension status started in lineup
+            if player.injury_status and player.injury_status.upper() in (
+                "IL10", "IL15", "IL60", "IL", "OUT", "SUSP",
+            ):
+                blunders.append(
+                    {
+                        "team": team.name,
+                        "player": player.name,
+                        "injury_status": player.injury_status,
+                        "roster_slot": slot.position,
+                        "detail": (
+                            f"Started {player.name} ({player.injury_status}) "
+                            f"in the {slot.position} slot all week"
+                        ),
+                    }
+                )
+
+    return blunders
+
+
 async def run_generate_recaps():
     reset_batch_quota_state()
     try:
@@ -143,6 +233,7 @@ async def run_generate_recaps():
                     }
                 )
 
+            # --- Current standings ---
             standings_data = []
             for team in sorted(teams.values(), key=lambda t: t.standing or 999):
                 standings_data.append(
@@ -154,6 +245,80 @@ async def run_generate_recaps():
                         "standing": team.standing,
                     }
                 )
+
+            # --- Previous week standings (for week-over-week movement) ---
+            prev_week_standings = []
+            if recap_week > 1:
+                prev_matchups_result = await session.execute(
+                    select(Matchup).where(
+                        Matchup.league_id == league.id,
+                        Matchup.week <= recap_week - 1,
+                    )
+                )
+                prev_matchups = prev_matchups_result.scalars().all()
+                prev_week_standings = _compute_standings_from_matchups(prev_matchups, teams)
+
+            # --- Season opener standings (after week 1 only, for arc narratives) ---
+            season_opener_standings = []
+            if recap_week > 2:
+                wk1_matchups_result = await session.execute(
+                    select(Matchup).where(
+                        Matchup.league_id == league.id,
+                        Matchup.week == 1,
+                    )
+                )
+                wk1_matchups = wk1_matchups_result.scalars().all()
+                season_opener_standings = _compute_standings_from_matchups(wk1_matchups, teams)
+
+
+            # --- Roster blunders (IL players started in active slots) ---
+            roster_blunders = await _detect_roster_blunders(session, teams, recap_week)
+
+            # --- Upset alerts (lower-ranked team beats higher-ranked team) ---
+            upsets = []
+            # Use previous week standings as the "going-in" ranking for upset detection
+            ranking_source = prev_week_standings if prev_week_standings else standings_data
+            team_rank_map = {entry["team"]: entry["standing"] for entry in ranking_source}
+            num_teams = len(team_rank_map)
+            midpoint = num_teams // 2  # "above the fold" threshold
+
+            for m in matchups:
+                team_a = teams.get(m.team_a_id)
+                team_b = teams.get(m.team_b_id)
+                if not team_a or not team_b:
+                    continue
+
+                a_rank = team_rank_map.get(team_a.name, 999)
+                b_rank = team_rank_map.get(team_b.name, 999)
+
+                # Determine winner and loser
+                if m.team_a_wins > m.team_b_wins:
+                    winner_name, winner_rank = team_a.name, a_rank
+                    loser_name, loser_rank = team_b.name, b_rank
+                elif m.team_b_wins > m.team_a_wins:
+                    winner_name, winner_rank = team_b.name, b_rank
+                    loser_name, loser_rank = team_a.name, a_rank
+                else:
+                    continue  # tie, not an upset
+
+                # Upset = winner was ranked lower (higher number) than loser,
+                # AND the loser was in the top half of the standings
+                spread = winner_rank - loser_rank
+                if spread > 0 and loser_rank <= midpoint:
+                    upsets.append(
+                        {
+                            "winner": winner_name,
+                            "winner_entering_rank": winner_rank,
+                            "loser": loser_name,
+                            "loser_entering_rank": loser_rank,
+                            "standings_spread": spread,
+                            "winner_cats": m.team_a_wins if winner_name == team_a.name else m.team_b_wins,
+                            "loser_cats": m.team_b_wins if winner_name == team_a.name else m.team_a_wins,
+                        }
+                    )
+
+            # Sort upsets by spread descending — biggest upsets first
+            upsets.sort(key=lambda u: u["standings_spread"], reverse=True)
 
             existing_league = await session.execute(
                 select(Recap).where(
@@ -167,6 +332,10 @@ async def run_generate_recaps():
                     "season_week_being_recapped": recap_week,
                     "matchups": base_matchup_data,
                     "standings": standings_data,
+                    "previous_week_standings": prev_week_standings,
+                    "season_opener_standings": season_opener_standings,
+                    "roster_blunders": roster_blunders,
+                    "upsets": upsets,
                 }
                 await _generate_one_recap(session, league, recap_week, "league", None, league_payload)
                 await session.commit()
@@ -237,6 +406,7 @@ async def run_generate_recaps():
                     "matchup": matchup_detail,
                     "roster": roster_names,
                     "league_standings": standings_data,
+                    "your_blunders": [b for b in roster_blunders if b["team"] == team.name],
                 }
 
                 await _generate_one_recap(session, league, recap_week, "manager", team, manager_payload)

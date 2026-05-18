@@ -23,6 +23,10 @@
     created_at: string;
   }
 
+  interface LeagueInfo {
+    current_week: number;
+  }
+
   let selectedWeek = $state(1);
   let maxWeek = $state(1);
   let recaps = $state<Recap[]>([]);
@@ -41,9 +45,9 @@
    */
   async function loadHistory() {
     try {
-      const [historyData, league]: [number[], any] = await Promise.all([
+      const [historyData, league]: [number[], LeagueInfo] = await Promise.all([
         api.get<number[]>("/recaps/history"),
-        api.get("/league/info"),
+        api.get<LeagueInfo>("/league/info"),
       ]);
 
       history = historyData;
@@ -72,8 +76,8 @@
     error = null;
     try {
       recaps = await api.get<Recap[]>(`/admin/recaps/${selectedWeek}`);
-    } catch (e: any) {
-      error = e.message;
+    } catch (e: unknown) {
+      error = e instanceof Error ? e.message : String(e);
     } finally {
       loading = false;
     }
@@ -88,13 +92,13 @@
     saving = true;
     try {
       await api.put(`/recaps/${editingRecap.id}`, { content: editContent });
-      const idx = recaps.findIndex((r) => r.id === editingRecap!.id);
+      const idx = recaps.findIndex((r) => r.id === editingRecap?.id);
       if (idx !== -1) recaps[idx] = { ...recaps[idx], content: editContent };
       editingRecap = null;
       successMessage = "Recap saved";
       setTimeout(() => (successMessage = null), 3000);
-    } catch (e: any) {
-      error = e.message;
+    } catch (e: unknown) {
+      error = e instanceof Error ? e.message : String(e);
     } finally {
       saving = false;
     }
@@ -112,8 +116,8 @@
       successMessage = "Regeneration queued — refresh in a moment";
       setTimeout(() => (successMessage = null), 5000);
       await loadRecaps();
-    } catch (e: any) {
-      error = e.message;
+    } catch (e: unknown) {
+      error = e instanceof Error ? e.message : String(e);
     } finally {
       regeneratingId = null;
     }
@@ -233,13 +237,13 @@
                   </div>
 
                   <div class="flex gap-2 shrink-0">
-                    <button
+                    <button type="button"
                       onclick={() => startEdit(recap)}
                       class="btn btn-secondary text-xs"
                     >
                       EDIT
                     </button>
-                    <button
+                    <button type="button"
                       onclick={() => regenerate(recap.id)}
                       disabled={regeneratingId === recap.id}
                       class="btn btn-primary text-xs"
@@ -312,13 +316,13 @@
                   </div>
 
                   <div class="flex gap-2 shrink-0">
-                    <button
+                    <button type="button"
                       onclick={() => startEdit(recap)}
                       class="btn btn-secondary text-xs"
                     >
                       EDIT
                     </button>
-                    <button
+                    <button type="button"
                       onclick={() => regenerate(recap.id)}
                       disabled={regeneratingId === recap.id}
                       class="btn btn-primary text-xs"
@@ -368,7 +372,7 @@
     <div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-3 gap-1.5">
       {#each Array.from({ length: maxWeek }, (_, i) => i + 1) as w}
         {@const hasHistory = history.includes(w)}
-        <button
+        <button type="button"
           onclick={() => loadRecaps(w)}
           class="aspect-square flex flex-col items-center justify-center font-mono transition-all duration-200 group border-2 relative cursor-pointer
           {selectedWeek === w
@@ -429,7 +433,7 @@
             ? "LEAGUE"
             : editingRecap.team_name} //
         </h2>
-        <button onclick={cancelEdit} class="btn btn-secondary text-xs">
+        <button type="button" onclick={cancelEdit} class="btn btn-secondary text-xs">
           [X] CLOSE
         </button>
       </div>
@@ -445,10 +449,10 @@
           spellcheck="false"
         ></textarea>
         <div class="flex justify-end gap-2">
-          <button onclick={cancelEdit} class="btn btn-secondary">
+          <button type="button" onclick={cancelEdit} class="btn btn-secondary">
             ABORT
           </button>
-          <button onclick={saveEdit} disabled={saving} class="btn btn-primary">
+          <button type="button" onclick={saveEdit} disabled={saving} class="btn btn-primary">
             {saving ? "COMMITTING..." : "COMMIT OVERRIDE"}
           </button>
         </div>

@@ -407,8 +407,8 @@ async def get_ai_settings(
 ):
     """Retrieve the current configurations and raw markdown templates for AI logic."""
     return AISettingsResponse(
-        primary_model="gemini-3.1-flash-lite-preview",
-        fallback_model="google/gemini-3.1-flash-lite-preview (OpenRouter)",
+        primary_model="gemini-3.1-flash-lite",
+        fallback_model="google/gemini-3.1-flash-lite (OpenRouter)",
         league_recap_prompt=_read_prompt("league_recap.md"),
         manager_recap_prompt=_read_prompt("manager_recap.md"),
         manager_briefing_prompt=_read_prompt("morning_briefing.md"),

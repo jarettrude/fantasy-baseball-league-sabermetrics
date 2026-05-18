@@ -5,9 +5,9 @@
   for tokens, and establishes authenticated session with redirect.
 -->
 <script lang="ts">
+  import { navigate } from "astro:transitions/client";
   import { onMount } from "svelte";
   import { api } from "../lib/api";
-  import { navigate } from "astro:transitions/client";
 
   let status = $state<"loading" | "success" | "error">("loading");
   let errorMsg = $state("");
@@ -28,10 +28,10 @@
       setTimeout(() => {
         navigate("/dashboard", { history: "replace" });
       }, 1000);
-    } catch (e: any) {
+    } catch (e: unknown) {
       status = "error";
       let reason = "generic";
-      const msg = e.message?.toLowerCase() || "";
+      const msg = e instanceof Error ? e.message?.toLowerCase() || "" : "";
       if (msg.includes("initialization")) {
         reason = "initialization";
       } else if (
@@ -64,7 +64,7 @@
       <div
         class="flex h-12 w-12 items-center justify-center rounded-full bg-(--color-success-muted) border border-(--color-success)"
       >
-        <svg
+        <svg aria-hidden="true"
           class="h-6 w-6 text-(--color-success)"
           fill="none"
           stroke="currentColor"
@@ -92,7 +92,7 @@
       <div
         class="flex h-12 w-12 items-center justify-center rounded-full bg-(--color-danger-muted) border border-(--color-danger)"
       >
-        <svg
+        <svg aria-hidden="true"
           class="h-6 w-6 text-(--color-danger)"
           fill="none"
           stroke="currentColor"

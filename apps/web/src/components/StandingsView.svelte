@@ -12,15 +12,17 @@
   let loading = $state(true);
   let error = $state<string | null>(null);
 
-  onMount(async () => {
+  async function loadStandings() {
     try {
       standings = await api.get("/league/standings");
-    } catch (e: any) {
-      error = e.message;
+    } catch (e: unknown) {
+      error = e instanceof Error ? e.message : String(e);
     } finally {
       loading = false;
     }
-  });
+  }
+
+  onMount(loadStandings);
 
   function formatTs(ts: string | null): string {
     if (!ts) return "Never";

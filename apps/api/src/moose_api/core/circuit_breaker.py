@@ -5,12 +5,11 @@ threshold failures, preventing cascading failures. Automatically
 resets after cooldown period.
 """
 
-import asyncio
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Callable
 
 logger = logging.getLogger(__name__)
 
