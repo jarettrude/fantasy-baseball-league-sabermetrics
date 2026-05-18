@@ -25,7 +25,7 @@
 		"lodash": "4.17.23",
 		"lucide-svelte": "^0.577.0",
 		"server-destroy": "^1.0.1",
-		"svelte": "^5.55.4",
+		"svelte": "^5.55.7",
 		"tailwindcss": "^4.2.4"
 	},
 	"devDependencies": {
