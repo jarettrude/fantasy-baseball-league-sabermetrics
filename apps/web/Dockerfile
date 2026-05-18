@@ -10,7 +10,7 @@ RUN npm install -g pnpm && pnpm install --frozen-lockfile
 COPY apps/web/src ./src
 COPY apps/web/public ./public
 COPY apps/web/astro.config.mjs apps/web/tsconfig.json ./
-COPY apps/web/svelte.config.js apps/web/eslint.config.js apps/web/prettier.config.mjs ./
+COPY apps/web/svelte.config.js apps/web/biome.json ./
 COPY apps/web/pnpm-workspace.yaml ./
 
 # Build-time variables for Astro baking

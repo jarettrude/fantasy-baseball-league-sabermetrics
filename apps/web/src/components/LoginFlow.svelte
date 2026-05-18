@@ -20,8 +20,8 @@
     try {
       const data = await api.post<{ redirect_url: string }>("/auth/login");
       window.location.href = data.redirect_url;
-    } catch (e: any) {
-      error = e.message || "Failed to start login";
+    } catch (e: unknown) {
+      error = e instanceof Error ? e.message : String(e) || "Failed to start login";
       loading = false;
     }
   }
@@ -45,7 +45,7 @@
     </div>
   {/if}
 
-  <button
+  <button type="button"
     onclick={startLogin}
     disabled={loading}
     class="btn btn-primary w-full"

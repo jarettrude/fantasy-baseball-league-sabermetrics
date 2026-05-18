@@ -256,7 +256,7 @@
 
     <div class="flex gap-2 flex-wrap items-center">
       <!-- Always-visible Yahoo sync button -->
-      <button
+      <button type="button"
         onclick={syncFromYahoo}
         disabled={syncingDraft}
         class="btn btn-secondary text-xs flex items-center gap-1.5"
@@ -271,7 +271,7 @@
       </button>
 
       {#if summary?.status === "published"}
-        <button
+        <button type="button"
           onclick={() => generateSummary(true)}
           disabled={generating || syncingDraft}
           class="btn btn-secondary text-xs"
@@ -279,7 +279,7 @@
           {generating ? "REGENERATING..." : "REGENERATE"}
         </button>
         {#if summary.content}
-          <button
+          <button type="button"
             onclick={startEdit}
             disabled={syncingDraft}
             class="btn btn-secondary text-xs"
@@ -288,7 +288,7 @@
           </button>
         {/if}
       {:else}
-        <button
+        <button type="button"
           onclick={() => generateSummary(false)}
           disabled={generating || syncingDraft}
           class="btn btn-primary text-xs"
@@ -319,7 +319,7 @@
   <!-- Tab nav -->
   <div class="flex overflow-x-auto border-b border-(--color-border)">
     {#each tabs as tab}
-      <button
+      <button type="button"
         onclick={() => (activeTab = tab.id)}
         class="whitespace-nowrap px-4 py-2.5 font-mono text-[0.6rem] font-bold uppercase tracking-widest transition-colors duration-200 border-b-2
         {activeTab === tab.id
@@ -352,7 +352,7 @@
           Import draft picks first, then click GENERATE SUMMARY to produce the
           AI analysis.
         </p>
-        <button
+        <button type="button"
           onclick={() => generateSummary(false)}
           disabled={generating || !summary || summary.teams_draft.length === 0}
           class="btn btn-primary text-xs"
@@ -368,7 +368,7 @@
         <p class="font-mono text-[0.6rem] text-(--color-text-muted)">
           Check AI provider connectivity and try regenerating.
         </p>
-        <button
+        <button type="button"
           onclick={() => generateSummary(true)}
           disabled={generating}
           class="btn btn-primary text-xs"
@@ -438,7 +438,7 @@
         <p class="font-mono text-[0.6rem] text-(--color-text-muted)">
           Pull the draft board directly from Yahoo to get started.
         </p>
-        <button
+        <button type="button"
           onclick={syncFromYahoo}
           disabled={syncingDraft}
           class="btn btn-primary text-xs mx-auto flex items-center gap-1.5"
@@ -456,7 +456,7 @@
       <div class="space-y-2">
         {#each summary.teams_draft as team (team.team_name)}
           <div class="card overflow-hidden">
-            <button
+            <button type="button"
               onclick={() => toggleTeam(team.team_name)}
               class="w-full flex items-center justify-between p-4 text-left hover:bg-(--color-surface-raised) transition-colors"
             >
@@ -664,7 +664,7 @@
             {:else}
               <span></span>
             {/if}
-            <button
+            <button type="button"
               onclick={savePrompt}
               disabled={savingPrompt}
               class="btn btn-primary text-xs"
@@ -700,7 +700,7 @@
         >
           // DRAFT SUMMARY EDITOR //
         </h2>
-        <button onclick={cancelEdit} class="btn btn-secondary text-xs">
+        <button type="button" onclick={cancelEdit} class="btn btn-secondary text-xs">
           [X] CLOSE
         </button>
       </div>
@@ -717,8 +717,8 @@
           spellcheck="false"
         ></textarea>
         <div class="flex justify-end gap-2">
-          <button onclick={cancelEdit} class="btn btn-secondary">ABORT</button>
-          <button onclick={saveEdit} disabled={saving} class="btn btn-primary">
+          <button type="button" onclick={cancelEdit} class="btn btn-secondary">ABORT</button>
+          <button type="button" onclick={saveEdit} disabled={saving} class="btn btn-primary">
             {saving ? "COMMITTING..." : "COMMIT OVERRIDE"}
           </button>
         </div>

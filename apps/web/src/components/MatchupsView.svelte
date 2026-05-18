@@ -14,17 +14,19 @@
   let loading = $state(true);
   let error = $state<string | null>(null);
 
-  onMount(async () => {
+  async function loadMatchups() {
+    const params: Record<string, string> = {};
     try {
-      const params: Record<string, string> = {};
       if (week !== undefined) params.week = String(week);
       data = await api.get("/league/matchups", params);
-    } catch (e: any) {
-      error = e.message;
+    } catch (e: unknown) {
+      error = e instanceof Error ? e.message : String(e);
     } finally {
       loading = false;
     }
-  });
+  }
+
+  onMount(loadMatchups);
 
   function formatTs(ts: string | null): string {
     if (!ts) return "Never";

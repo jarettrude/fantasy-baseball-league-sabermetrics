@@ -6,15 +6,15 @@
   Handles login/logout flows and redirects appropriately.
 -->
 <script lang="ts">
-  import logo from "../assets/mse_logo.svg";
   import { onMount } from "svelte";
+  import logo from "../assets/mse_logo.svg";
+  import { api } from "../lib/api";
   import {
     fetchUser,
     getIsLoading,
     getUser,
     logout,
   } from "../lib/stores.svelte";
-  import { api } from "../lib/api";
 
   let user = $derived(getUser());
   let isLoading = $derived(getIsLoading());
@@ -102,19 +102,19 @@
             >Commissioner</span
           >
         {/if}
-        <button
+        <button type="button"
           onclick={() => logout()}
           class="btn btn-ghost btn-sm hidden md:inline-flex"
         >
           Logout
         </button>
-        <button
+        <button type="button"
           onclick={() => (menuOpen = !menuOpen)}
           class="md:hidden p-2 rounded-sm text-(--color-text-secondary) hover:text-(--color-text) hover:bg-(--color-surface-raised)"
           aria-label="Toggle menu"
           aria-expanded={menuOpen}
         >
-          <svg
+          <svg aria-hidden="true"
             class="h-5 w-5"
             fill="none"
             stroke="currentColor"
@@ -173,7 +173,7 @@
         >
       {/if}
       <div class="border-t border-(--color-border-subtle) mt-2 pt-2">
-        <button
+        <button type="button"
           onclick={() => logout()}
           class="btn btn-ghost btn-sm w-full justify-start"
         >

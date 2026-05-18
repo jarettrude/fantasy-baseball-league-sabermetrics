@@ -1,27 +1,27 @@
-import { defineConfig } from "astro/config";
+import node from "@astrojs/node";
 import svelte from "@astrojs/svelte";
 import tailwindcss from "@tailwindcss/vite";
-import node from "@astrojs/node";
+import { defineConfig } from "astro/config";
 
 export default defineConfig({
-  output: "server",
-  adapter: node({ mode: "standalone" }),
-  integrations: [svelte()],
-  vite: {
-    plugins: [tailwindcss()],
-    resolve: {
-      alias: {},
-    },
-    server: {
-      allowedHosts: ["moosesportsempire.ca"],
-    },
-  },
-  site: "https://moosesportsempire.ca",
-  server: {
-    port: 4321,
-    host: true,
-  },
-  security: {
-    checkOrigin: true,
-  },
+	output: "server",
+	adapter: node({ mode: "standalone" }),
+	integrations: [svelte()],
+	vite: {
+		plugins: [tailwindcss()],
+		resolve: {
+			alias: {},
+		},
+		server: {
+			allowedHosts: ["moosesportsempire.ca"],
+		},
+	},
+	site: "https://moosesportsempire.ca",
+	server: {
+		port: 4321,
+		host: true,
+	},
+	security: {
+		checkOrigin: true,
+	},
 });

@@ -45,8 +45,8 @@
     error = null;
     try {
       mappings = await api.get<Mapping[]>("/players/mappings");
-    } catch (e: any) {
-      error = e.message;
+    } catch (e: unknown) {
+      error = e instanceof Error ? e.message : String(e);
     } finally {
       loading = false;
     }
@@ -65,8 +65,8 @@
       successMessage = `Confirmed ${res.confirmed} auto-mappings`;
       setTimeout(() => (successMessage = null), 4000);
       await loadMappings();
-    } catch (e: any) {
-      error = e.message;
+    } catch (e: unknown) {
+      error = e instanceof Error ? e.message : String(e);
     } finally {
       confirmingAll = false;
     }
@@ -98,7 +98,7 @@
     error = null;
     try {
       await api.put(`/players/mappings/${m.id}`, {
-        mlb_id: editMlbId ? parseInt(editMlbId) : null,
+        mlb_id: editMlbId ? parseInt(editMlbId, 10) : null,
         lahman_id: editLahmanId || null,
         status: "manual",
         notes: editNotes || null,
@@ -107,7 +107,7 @@
       if (idx !== -1) {
         mappings[idx] = {
           ...mappings[idx],
-          mlb_id: editMlbId ? parseInt(editMlbId) : null,
+          mlb_id: editMlbId ? parseInt(editMlbId, 10) : null,
           lahman_id: editLahmanId || null,
           status: "manual",
           notes: editNotes || null,
@@ -116,8 +116,8 @@
       editingId = null;
       successMessage = "Mapping updated";
       setTimeout(() => (successMessage = null), 3000);
-    } catch (e: any) {
-      error = e.message;
+    } catch (e: unknown) {
+      error = e instanceof Error ? e.message : String(e);
     } finally {
       saving = false;
     }
@@ -139,8 +139,8 @@
       if (idx !== -1) mappings[idx] = { ...mappings[idx], status: "confirmed" };
       successMessage = `${m.player_name} confirmed`;
       setTimeout(() => (successMessage = null), 2000);
-    } catch (e: any) {
-      error = e.message;
+    } catch (e: unknown) {
+      error = e instanceof Error ? e.message : String(e);
     }
   }
 
@@ -231,7 +231,7 @@
     </div>
 
     {#if ambiguousCount > 0}
-      <button
+      <button type="button"
         onclick={confirmAll}
         disabled={confirmingAll}
         class="btn btn-primary text-xs"
@@ -359,13 +359,13 @@
               <td class="px-3 py-3 text-right">
                 {#if editingId === m.id}
                   <div class="flex gap-1.5 justify-end">
-                    <button
+                    <button type="button"
                       onclick={cancelEdit}
                       class="btn btn-secondary text-xs px-2 py-1"
                     >
                       ABORT
                     </button>
-                    <button
+                    <button type="button"
                       onclick={() => saveMapping(m)}
                       disabled={saving}
                       class="btn btn-primary text-xs px-2 py-1"
@@ -376,14 +376,14 @@
                 {:else}
                   <div class="flex gap-1.5 justify-end">
                     {#if m.status === "ambiguous"}
-                      <button
+                      <button type="button"
                         onclick={() => confirmMapping(m)}
                         class="btn btn-success text-xs px-2 py-1"
                       >
                         CONFIRM
                       </button>
                     {/if}
-                    <button
+                    <button type="button"
                       onclick={() => startEdit(m)}
                       class="btn btn-secondary text-xs px-2 py-1"
                     >

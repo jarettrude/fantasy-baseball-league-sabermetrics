@@ -88,7 +88,7 @@
       await api.put(`/admin/briefings/${editingBriefing.id}`, {
         content: editContent,
       });
-      const idx = briefings.findIndex((b) => b.id === editingBriefing!.id);
+      const idx = briefings.findIndex((b) => b.id === editingBriefing?.id);
       if (idx !== -1)
         briefings[idx] = { ...briefings[idx], content: editContent };
       editingBriefing = null;
@@ -201,13 +201,13 @@
               </div>
 
               <div class="flex gap-2 shrink-0">
-                <button
+                <button type="button"
                   onclick={() => startEdit(b)}
                   class="btn btn-secondary text-xs"
                 >
                   EDIT
                 </button>
-                <button
+                <button type="button"
                   onclick={() => regenerate(b.id)}
                   disabled={regeneratingId === b.id}
                   class="btn btn-primary text-xs"
@@ -250,7 +250,7 @@
     <div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-3 gap-1.5">
       {#each Array.from({ length: maxWeek }, (_, i) => i + 1) as w}
         {@const hasHistory = history.includes(w)}
-        <button
+        <button type="button"
           onclick={() => loadBriefings(w)}
           class="aspect-square flex flex-col items-center justify-center font-mono transition-all duration-200 group border-2 relative cursor-pointer
           {selectedWeek === w
@@ -303,7 +303,7 @@
         >
           // BRIEFING EDITOR: {editingBriefing.team_name} //
         </h2>
-        <button onclick={cancelEdit} class="btn btn-secondary text-xs">
+        <button type="button" onclick={cancelEdit} class="btn btn-secondary text-xs">
           [X] CLOSE
         </button>
       </div>
@@ -319,10 +319,10 @@
           spellcheck="false"
         ></textarea>
         <div class="flex justify-end gap-2">
-          <button onclick={cancelEdit} class="btn btn-secondary">
+          <button type="button" onclick={cancelEdit} class="btn btn-secondary">
             ABORT
           </button>
-          <button onclick={saveEdit} disabled={saving} class="btn btn-primary">
+          <button type="button" onclick={saveEdit} disabled={saving} class="btn btn-primary">
             {saving ? "COMMITTING..." : "COMMIT OVERRIDE"}
           </button>
         </div>

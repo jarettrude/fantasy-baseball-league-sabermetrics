@@ -6,7 +6,6 @@ with fallback to MLB Stats API.
 """
 
 import logging
-from datetime import date
 
 logger = logging.getLogger(__name__)
 

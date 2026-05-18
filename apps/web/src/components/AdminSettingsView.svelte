@@ -56,8 +56,8 @@
       });
       saveSuccess = true;
       setTimeout(() => (saveSuccess = false), 3000);
-    } catch (e: any) {
-      saveError = e.message || "Save failed";
+    } catch (e: unknown) {
+      saveError = e instanceof Error ? e.message : String(e) || "Save failed";
     } finally {
       savingSettings = false;
     }
@@ -207,7 +207,7 @@
         </div>
 
         <div class="flex justify-end">
-          <button
+          <button type="button"
             onclick={saveSettings}
             disabled={savingSettings}
             class="btn btn-primary"

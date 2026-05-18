@@ -6,10 +6,10 @@
   Handles authentication state and redirects to login if not authenticated.
 -->
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
+  import { navigate } from "astro:transitions/client";
+  import { onDestroy, onMount } from "svelte";
   import { api } from "../lib/api";
   import { fetchUser, getUser } from "../lib/stores.svelte";
-  import { navigate } from "astro:transitions/client";
 
   interface MatchupData {
     team_a_name: string;

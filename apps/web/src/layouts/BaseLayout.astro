@@ -1,4 +1,7 @@
 ---
+
+
+
 import ogImage from "../assets/og-image.png";
 import "../styles/global.css";
 
@@ -53,7 +56,7 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 
     <!-- Apply saved theme before first paint to prevent flash -->
     <script is:inline>
-      (function () {
+      (() => {
         const t = localStorage.getItem("mse-theme");
         document.documentElement.setAttribute(
           "data-theme",
