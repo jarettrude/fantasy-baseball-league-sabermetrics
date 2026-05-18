@@ -21,7 +21,7 @@
 		"@astrojs/svelte": "^8.0.5",
 		"@tailwindcss/typography": "^0.5.19",
 		"@tailwindcss/vite": "^4.2.4",
-		"astro": "^6.1.9",
+		"astro": "^6.1.10",
 		"lodash": "4.17.23",
 		"lucide-svelte": "^0.577.0",
 		"server-destroy": "^1.0.1",
