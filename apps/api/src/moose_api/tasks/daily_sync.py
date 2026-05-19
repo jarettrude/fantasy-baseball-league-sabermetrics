@@ -21,6 +21,13 @@ async def run_daily_sync():
         ("sync_roster", "moose_api.tasks.sync_roster", "run_sync_roster", [], True),
         ("sync_free_agents", "moose_api.tasks.sync_free_agents", "run_sync_free_agents", [], True),
         (
+            "sync_roster_trends",
+            "moose_api.tasks.sync_roster_trends",
+            "run_sync_roster_trends",
+            [],
+            False,
+        ),
+        (
             "sync_rotowire_injuries",
             "moose_api.tasks.sync_rotowire_injuries",
             "run_sync_rotowire_injuries",

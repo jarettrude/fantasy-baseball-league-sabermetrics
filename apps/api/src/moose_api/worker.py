@@ -464,6 +464,7 @@ class WorkerSettings:
         cron(purge_ai_prompt_raw, hour=3, minute=0),
         cron(purge_free_agent_snapshots, hour=3, minute=30),
         cron(generate_briefings, hour=6, minute=30),
+        cron(generate_weekly_recaps, weekday=1, hour=7, minute=0),  # Monday 7 AM
     ]
 
     redis_settings = RedisSettings.from_dsn(settings.redis_url)

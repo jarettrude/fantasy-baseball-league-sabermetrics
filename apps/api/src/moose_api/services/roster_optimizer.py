@@ -33,7 +33,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from moose_api.models.free_agent import FreeAgentSnapshot
@@ -75,6 +75,10 @@ _NON_COMPETITIVE_SLOTS = frozenset({"BN", "IL", "IL10", "IL60", "NA", "DL"})
 _HITTER_FLEX_SLOTS = frozenset({"Util", "UTIL"})
 _PITCHER_FLEX_SLOTS = frozenset({"P"})
 
+# Injury status codes that indicate a player is hurt and should not be
+# evaluated for standard performance-based drops (they belong on the IL).
+_INJURED_STATUS_CODES = frozenset({"IL10", "IL60", "IL", "DL", "OUT"})
+
 
 @dataclass(frozen=True)
 class PlayerLite:
@@ -99,6 +103,7 @@ class ValuedPlayer:
     our_rank: int | None
     yahoo_rank: int | None
     next_games_value: Decimal | None
+    rest_of_season_value: Decimal | None = None
     roster_slot: str | None = None
     roster_percent: float | None = None
     roster_trend: float | None = None
@@ -140,6 +145,16 @@ class DropCandidate:
 
 
 @dataclass
+class BenchSwap:
+    """A bench player who should be starting over a weaker incumbent."""
+
+    position: str
+    bench_player: ValuedPlayer
+    incumbent: ValuedPlayer
+    delta: Decimal
+
+
+@dataclass
 class ILStashCandidate:
     """High-value injured free agent returning soon — worth stashing."""
 
@@ -160,6 +175,7 @@ class RosterRecommendations:
     top_fa_overall: list[ValuedPlayer]
     category_weaknesses: list[dict] = field(default_factory=list)
     il_stash_candidates: list[ILStashCandidate] = field(default_factory=list)
+    bench_swaps: list[BenchSwap] = field(default_factory=list)
 
 
 def _required_starter_positions(roster_positions: list[dict]) -> set[str]:
@@ -247,10 +263,32 @@ async def _latest_next_games_value_map(
     return result
 
 
+async def _latest_ros_value_map(
+    db: AsyncSession, player_ids: list[int]
+) -> dict[int, PlayerValueSnapshot]:
+    """Return the latest rest_of_season snapshot per player."""
+    result: dict[int, PlayerValueSnapshot] = {}
+    if not player_ids:
+        return result
+    rows = await db.execute(
+        select(PlayerValueSnapshot)
+        .where(
+            PlayerValueSnapshot.player_id.in_(player_ids),
+            PlayerValueSnapshot.type == "rest_of_season",
+        )
+        .order_by(PlayerValueSnapshot.snapshot_date.desc())
+    )
+    for snap in rows.scalars():
+        if snap.player_id not in result:
+            result[snap.player_id] = snap
+    return result
+
+
 def _valued(
     player: Player,
     season_snap: PlayerValueSnapshot | None,
     next_snap: PlayerValueSnapshot | None,
+    ros_snap: PlayerValueSnapshot | None = None,
     roster_slot: str | None = None,
 ) -> ValuedPlayer | None:
     """Pair a player with their snapshots; skip if no season value."""
@@ -263,6 +301,9 @@ def _valued(
         yahoo_rank=season_snap.yahoo_rank or player.yahoo_rank,
         next_games_value=(
             Decimal(next_snap.composite_value) if next_snap is not None else None
+        ),
+        rest_of_season_value=(
+            Decimal(ros_snap.composite_value) if ros_snap is not None else None
         ),
         roster_slot=roster_slot,
         roster_percent=float(season_snap.roster_percent) if season_snap.roster_percent is not None else None,
@@ -306,19 +347,31 @@ async def build_recommendations(
     roster_rows = roster_rows_result.all()
     roster_player_ids = [p.id for _, p in roster_rows]
 
+    from datetime import datetime, timedelta, UTC
+    cutoff = datetime.now(UTC) - timedelta(hours=24)
+
     fa_subq = (
         select(
             FreeAgentSnapshot.player_id,
-            FreeAgentSnapshot.snapshot_at,
+            func.max(FreeAgentSnapshot.snapshot_at).label("max_snap"),
         )
-        .where(FreeAgentSnapshot.league_id == (league.id if league else -1))
-        .where(FreeAgentSnapshot.is_available.is_(True))
-        .distinct(FreeAgentSnapshot.player_id)
-        .order_by(FreeAgentSnapshot.player_id, FreeAgentSnapshot.snapshot_at.desc())
+        .where(
+            FreeAgentSnapshot.league_id == (league.id if league else -1),
+            FreeAgentSnapshot.snapshot_at >= cutoff
+        )
+        .group_by(FreeAgentSnapshot.player_id)
         .subquery()
     )
+
     fa_rows_result = await db.execute(
-        select(Player).join(fa_subq, fa_subq.c.player_id == Player.id)
+        select(Player)
+        .join(fa_subq, fa_subq.c.player_id == Player.id)
+        .join(
+            FreeAgentSnapshot, 
+            (FreeAgentSnapshot.player_id == fa_subq.c.player_id) & 
+            (FreeAgentSnapshot.snapshot_at == fa_subq.c.max_snap)
+        )
+        .where(FreeAgentSnapshot.is_available.is_(True))
     )
     fa_players = list(fa_rows_result.scalars())
     fa_player_ids = [p.id for p in fa_players]
@@ -326,11 +379,18 @@ async def build_recommendations(
     all_ids = list({*roster_player_ids, *fa_player_ids})
     season_map = await _latest_season_value_map(db, all_ids)
     next_map = await _latest_next_games_value_map(db, all_ids)
+    ros_map = await _latest_ros_value_map(db, all_ids)
 
     roster_valued: list[ValuedPlayer] = []
     roster_by_id: dict[int, ValuedPlayer] = {}
     for slot, player in roster_rows:
-        vp = _valued(player, season_map.get(player.id), next_map.get(player.id), roster_slot=slot.position)
+        vp = _valued(
+            player, 
+            season_map.get(player.id), 
+            next_map.get(player.id), 
+            ros_map.get(player.id),
+            roster_slot=slot.position
+        )
         if vp is None:
             continue
         roster_valued.append(vp)
@@ -338,7 +398,12 @@ async def build_recommendations(
 
     fa_valued: list[ValuedPlayer] = []
     for player in fa_players:
-        vp = _valued(player, season_map.get(player.id), next_map.get(player.id))
+        vp = _valued(
+            player, 
+            season_map.get(player.id), 
+            next_map.get(player.id),
+            ros_map.get(player.id)
+        )
         if vp is not None:
             fa_valued.append(vp)
     fa_valued.sort(key=lambda vp: vp.composite_value, reverse=True)
@@ -354,6 +419,7 @@ async def build_recommendations(
             for vp in roster_valued
             if _eligible_for(position, vp.player.eligible_positions, vp.player.is_pitcher)
             and (vp.roster_slot or "") not in _NON_COMPETITIVE_SLOTS
+            and (vp.player.injury_status or "") not in _INJURED_STATUS_CODES
         ]
         incumbent = min(eligible_roster, key=lambda vp: vp.composite_value, default=None)
 
@@ -372,7 +438,11 @@ async def build_recommendations(
     drops: list[DropCandidate] = []
     seen_player_ids: set[int] = set()
 
-    starter_valued = [vp for vp in roster_valued if (vp.roster_slot or "") not in _NON_COMPETITIVE_SLOTS]
+    starter_valued = [
+        vp for vp in roster_valued 
+        if (vp.roster_slot or "") not in _NON_COMPETITIVE_SLOTS
+        and (vp.player.injury_status or "") not in _INJURED_STATUS_CODES
+    ]
     for vp in sorted(starter_valued, key=lambda v: v.composite_value)[:GLOBAL_WORST_COUNT]:
         drops.append(DropCandidate(player=vp, reason="lowest_overall"))
         seen_player_ids.add(vp.player.id)
@@ -407,6 +477,7 @@ async def build_recommendations(
 
     # --- Category weakness analysis ---
     category_weaknesses: list[dict] = []
+    weak_cat_names: set[str] = set()
     if league and league.stat_categories:
         cat_names = [
             c.get("display_name")
@@ -432,6 +503,59 @@ async def build_recommendations(
 
         cat_avgs.sort(key=lambda x: x["team_avg_zscore"])
         category_weaknesses = cat_avgs[:3]
+        weak_cat_names = {cw["category"] for cw in category_weaknesses}
+
+    # --- Category-targeted free agent boost ---
+    # Annotate top_fa_overall with which team weaknesses they address.
+    # This lets the LLM make category-aware recommendations.
+    fa_category_tags: dict[int, list[str]] = {}
+    if weak_cat_names:
+        for vp in fa_valued:
+            snap = season_map.get(vp.player.id)
+            if not snap or not snap.category_scores:
+                continue
+            addressed = []
+            for wcat in weak_cat_names:
+                score = snap.category_scores.get(wcat)
+                if score is not None and float(score) > 0.3:
+                    addressed.append(wcat)
+            if addressed:
+                fa_category_tags[vp.player.id] = addressed
+
+    # --- Bench-to-starter swap detection ---
+    bench_swaps: list[BenchSwap] = []
+    bench_valued = [
+        vp for vp in roster_valued
+        if (vp.roster_slot or "") in _NON_COMPETITIVE_SLOTS
+        and vp.player.injury_status not in ("IL10", "IL60", "OUT")
+    ]
+    for position in sorted(required_positions):
+        # Find weakest active starter at this position
+        eligible_starters = [
+            vp for vp in roster_valued
+            if _eligible_for(position, vp.player.eligible_positions, vp.player.is_pitcher)
+            and (vp.roster_slot or "") not in _NON_COMPETITIVE_SLOTS
+        ]
+        weakest_starter = min(eligible_starters, key=lambda vp: vp.composite_value, default=None)
+        if weakest_starter is None:
+            continue
+
+        # Check if any bench player eligible at this position is better
+        for bench_vp in bench_valued:
+            if not _eligible_for(position, bench_vp.player.eligible_positions, bench_vp.player.is_pitcher):
+                continue
+            delta = bench_vp.composite_value - weakest_starter.composite_value
+            if delta >= UPGRADE_THRESHOLD:
+                # Avoid duplicate swaps for the same bench player
+                if not any(bs.bench_player.player.id == bench_vp.player.id for bs in bench_swaps):
+                    bench_swaps.append(BenchSwap(
+                        position=position,
+                        bench_player=bench_vp,
+                        incumbent=weakest_starter,
+                        delta=delta,
+                    ))
+
+    bench_swaps.sort(key=lambda bs: bs.delta, reverse=True)
 
     # --- IL stash candidates ---
     il_stash_candidates: list[ILStashCandidate] = []
@@ -469,6 +593,7 @@ async def build_recommendations(
         top_fa_overall=top_fa_overall,
         category_weaknesses=category_weaknesses,
         il_stash_candidates=il_stash_candidates,
+        bench_swaps=bench_swaps,
     )
 
 
@@ -536,5 +661,14 @@ def recommendations_to_prompt_payload(rec: RosterRecommendations) -> dict:
                 "days_until_return": s.days_until_return,
             }
             for s in rec.il_stash_candidates
+        ],
+        "bench_swaps": [
+            {
+                "position": bs.position,
+                "bench_player": _vp(bs.bench_player),
+                "incumbent": _vp(bs.incumbent),
+                "delta": float(bs.delta),
+            }
+            for bs in rec.bench_swaps
         ],
     }

@@ -3,6 +3,11 @@
 Provides intelligent failover between multiple LLM providers (Google AI Studio,
 OpenRouter) with automatic quota exhaustion detection and fallback strategies.
 Implements retry logic and cost optimization for reliable AI text generation.
+
+Model tier strategy (2026-05 audit):
+- Primary: Gemini 2.5 Flash (thinking model, best reasoning) — 5 RPM, 20 RPD
+- Fallback 1: Gemini 3.1 Flash Lite (fast, high quota) — 15 RPM, 500 RPD
+- Fallback 2: OpenRouter (external, metered) — last resort
 """
 
 from __future__ import annotations
@@ -28,6 +33,7 @@ class BatchQuotaState:
     """
 
     def __init__(self):
+        self.gemini_2_5_flash_exhausted = False
         self.gemini_3_1_flash_lite_exhausted = False
 
 
@@ -40,6 +46,7 @@ def reset_batch_quota_state():
     Called at the start of new batch jobs to ensure fresh quota state
     and allow retry of previously exhausted providers.
     """
+    batch_quota.gemini_2_5_flash_exhausted = False
     batch_quota.gemini_3_1_flash_lite_exhausted = False
 
 
@@ -100,21 +107,33 @@ class LLMError(Exception):
 
 
 async def _call_gemini(
-    prompt: str, system_prompt: str = "", model: str = "gemini-3.1-flash-lite"
+    prompt: str, system_prompt: str = "", model: str = "gemini-2.5-flash"
 ) -> LLMResponse:
-    full_prompt = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
+    """Call Gemini API with proper systemInstruction separation.
+
+    Uses the Gemini API's dedicated systemInstruction field rather than
+    concatenating system and user prompts into a single message. This
+    gives the model much stronger instruction adherence.
+    """
     url = GEMINI_API_BASE.format(model=model)
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    # Build request body with proper system/user separation
+    body: dict = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": 0.8,
+            "maxOutputTokens": 2048,
+        },
+    }
+
+    # Use the dedicated systemInstruction field when available
+    if system_prompt:
+        body["systemInstruction"] = {"parts": [{"text": system_prompt}]}
+
+    async with httpx.AsyncClient(timeout=90.0) as client:
         resp = await client.post(
             f"{url}?key={settings.google_gemini_api_key}",
-            json={
-                "contents": [{"parts": [{"text": full_prompt}]}],
-                "generationConfig": {
-                    "temperature": 0.8,
-                    "maxOutputTokens": 2048,
-                },
-            },
+            json=body,
         )
 
     if resp.status_code != 200:
@@ -145,7 +164,7 @@ async def _call_openrouter(prompt: str, system_prompt: str = "") -> LLMResponse:
         messages.append({"role": "system", "content": system_prompt})
     messages.append({"role": "user", "content": prompt})
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=90.0) as client:
         resp = await client.post(
             OPENROUTER_URL,
             headers={
@@ -153,7 +172,7 @@ async def _call_openrouter(prompt: str, system_prompt: str = "") -> LLMResponse:
                 "Content-Type": "application/json",
             },
             json={
-                "model": "google/gemini-3.1-flash-lite",
+                "model": "google/gemini-2.5-flash",
                 "messages": messages,
                 "temperature": 0.8,
                 "max_tokens": 2048,
@@ -174,15 +193,42 @@ async def _call_openrouter(prompt: str, system_prompt: str = "") -> LLMResponse:
     return LLMResponse(
         content=content,
         provider="openrouter",
-        model="google/gemini-3.1-flash-lite",
+        model="google/gemini-2.5-flash",
         input_tokens=usage.get("prompt_tokens", 0),
         output_tokens=usage.get("completion_tokens", 0),
     )
 
 
 async def generate_text(prompt: str, system_prompt: str = "") -> LLMResponse:
+    """Generate text using a tiered LLM strategy.
+
+    Tier 1: Gemini 2.5 Flash (thinking model, best quality, 20 RPD)
+    Tier 2: Gemini 3.1 Flash Lite (fast, high quota, 500 RPD)
+    Tier 3: OpenRouter (external fallback)
+
+    Each tier has automatic quota exhaustion detection. Once a tier is
+    marked exhausted for the current batch, subsequent calls skip directly
+    to the next tier.
+    """
     last_error = None
 
+    # --- Tier 1: Gemini 2.5 Flash (best quality, 20 RPD) ---
+    if not batch_quota.gemini_2_5_flash_exhausted:
+        for attempt in range(2):
+            try:
+                logger.info("Attempting LLM generation with gemini-2.5-flash...")
+                return await _call_gemini(prompt, system_prompt, model="gemini-2.5-flash")
+            except LLMError as e:
+                last_error = e
+                if is_daily_quota_exhausted(e) or str(e).find("RESOURCE_EXHAUSTED") != -1:
+                    batch_quota.gemini_2_5_flash_exhausted = True
+                    logger.warning("gemini-2.5-flash quota exhausted. Falling back to Flash Lite.")
+                    break
+                logger.warning("gemini-2.5-flash attempt %d failed: %s", attempt + 1, e)
+                if attempt < 1:
+                    await asyncio.sleep(2**attempt)
+
+    # --- Tier 2: Gemini 3.1 Flash Lite (high quota fallback, 500 RPD) ---
     if not batch_quota.gemini_3_1_flash_lite_exhausted:
         for attempt in range(2):
             try:
@@ -192,13 +238,14 @@ async def generate_text(prompt: str, system_prompt: str = "") -> LLMResponse:
                 last_error = e
                 if is_daily_quota_exhausted(e) or str(e).find("RESOURCE_EXHAUSTED") != -1:
                     batch_quota.gemini_3_1_flash_lite_exhausted = True
-                    logger.warning("gemini-3.1-flash-lite quota exhausted. Skipping for rest of batch.")
+                    logger.warning("gemini-3.1-flash-lite quota exhausted. Falling back to OpenRouter.")
                     break
                 logger.warning("gemini-3.1-flash-lite attempt %d failed: %s", attempt + 1, e)
                 if attempt < 1:
                     await asyncio.sleep(2**attempt)
 
-    logger.warning("Gemini tier exhausted or failed. Falling back to OpenRouter.")
+    # --- Tier 3: OpenRouter (last resort) ---
+    logger.warning("All Gemini tiers exhausted or failed. Falling back to OpenRouter.")
     try:
         return await _call_openrouter(prompt, system_prompt)
     except LLMError as e:

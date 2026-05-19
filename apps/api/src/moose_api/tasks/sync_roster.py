@@ -98,6 +98,11 @@ async def run_sync_roster():
                         if player_data.yahoo_rank is not None:
                             player.yahoo_rank = player_data.yahoo_rank
 
+                    # Use the Yahoo selected_position (actual lineup slot: BN, Util, SS, etc.)
+                    # rather than primary_position (player type). Falls back to primary_position
+                    # if Yahoo didn't return selected_position (shouldn't happen for roster calls).
+                    slot_position = player_data.selected_position or player_data.primary_position
+
                     # Upsert roster slot
                     slot_result = await session.execute(
                         select(RosterSlot).where(
@@ -105,7 +110,6 @@ async def run_sync_roster():
                             RosterSlot.player_id == player.id,
                             RosterSlot.season == season,
                             RosterSlot.week == current_week,
-                            RosterSlot.position == player_data.primary_position,
                         )
                     )
                     slot = slot_result.scalar_one_or_none()
@@ -114,13 +118,14 @@ async def run_sync_roster():
                         slot = RosterSlot(
                             team_id=team.id,
                             player_id=player.id,
-                            position=player_data.primary_position,
+                            position=slot_position,
                             season=season,
                             week=current_week,
                             is_active=True,
                         )
                         session.add(slot)
                     else:
+                        slot.position = slot_position
                         slot.is_active = True
                         slot.updated_at = datetime.now(UTC)
 

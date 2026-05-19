@@ -2,8 +2,8 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files for dependency installation
-COPY apps/web/package.json apps/web/pnpm-lock.yaml* ./
+# Copy package files for dependency installation (includes pnpm-workspace.yaml for allowBuilds config)
+COPY apps/web/package.json apps/web/pnpm-lock.yaml* apps/web/pnpm-workspace.yaml ./
 RUN npm install -g pnpm && pnpm install --frozen-lockfile
 
 # Copy source (package files already copied above)
@@ -11,7 +11,6 @@ COPY apps/web/src ./src
 COPY apps/web/public ./public
 COPY apps/web/astro.config.mjs apps/web/tsconfig.json ./
 COPY apps/web/svelte.config.js apps/web/biome.json ./
-COPY apps/web/pnpm-workspace.yaml ./
 
 # Build-time variables for Astro baking
 ARG PUBLIC_API_URL
@@ -32,6 +31,7 @@ COPY --from=builder /app/dist ./dist
 # IMPORTANT: We need package.json to run in production mode
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/pnpm-lock.yaml ./
+COPY --from=builder /app/pnpm-workspace.yaml ./
 
 # Install ONLY production dependencies
 RUN pnpm install --prod --frozen-lockfile

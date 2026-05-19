@@ -9,16 +9,15 @@ Write a brief personal recap addressed to this manager about their matchup this 
 - `standing` — their current league standing.
 - `record` — season win-loss-tie record.
 - `matchup` — their head-to-head result this week with full category breakdown.
-- `roster` — their active roster with player names, positions, and injury status.
 - `league_standings` — full league standings for context.
-- `your_blunders` — a list of roster blunders for THIS team specifically. Each entry shows a player who was started in an active lineup slot while carrying an IL/OUT/SUSP designation. If non-empty, these are self-inflicted wounds that must be called out. If empty, this team managed their roster properly.
+- `your_deep_cuts` — a list of players this manager started in active lineup slots who are rostered in fewer than 65% of leagues. Each entry has `player`, `position`, `roster_percent`, and `composite_value`. A positive composite value with low ownership means they found a hidden gem most managers are sleeping on. A negative composite value with low ownership means they are starting someone the rest of the league has correctly identified as droppable. If non-empty, react accordingly. If empty, this manager is running a conventional roster — no deep cuts to discuss.
 
 ## What to produce
 
 1. **Result summary.** Open with their matchup result — categories won/lost/tied, and whether they won or lost the week.
 2. **Best performers.** Highlight their top 2-3 players who carried the load. Give credit where due.
-3. **Underperformers or missed opportunities.** Call out players who went cold or spots where they left points on the table. If any rostered players have injury status (IL, OUT, etc.) but were in active lineup slots, point that out directly — that's a self-inflicted wound.
-4. **Strategic suggestion.** One concrete area to focus on next week based on the data (e.g., a weak pitching category, a position to stream, a cold bat to consider benching).
+3. **Category analysis.** Which categories did they win convincingly? Which did they lose badly? Were there any categories lost by razor-thin margins that could have swung the result?
+4. **Deep cut check.** If `your_deep_cuts` is non-empty, comment on their unconventional roster choices. Praise the genius picks (positive composite value) and question the questionable ones (negative composite value). Frame it as: "Are you a waiver-wire wizard or just throwing darts blindfolded?"
 5. **Closing chirp or encouragement.** End with something memorable — congratulate a strong week with a backhanded compliment, or console a bad week with a reality check.
 
 ## Tone calibration
@@ -31,11 +30,12 @@ Write a brief personal recap addressed to this manager about their matchup this 
 
 ## Hard rules
 
-- Keep it between 200-400 words
+- Keep it between 250-500 words
 - Reference specific stats from the data provided
 - Do NOT use emoji anywhere
 - No "As an AI..." preambles
 - Use Markdown: **bold** player names, bullet lists for stat breakdowns if needed
 - Use ONLY the data provided — do not invent stats
+- All data in the payload is HISTORICAL. Do not comment on current roster construction, future lineup decisions, or specific players to add/drop. That is the domain of the daily briefing, not the weekly recap.
 
 The stat data for this manager's week is provided in the JSON payload below. Use ONLY the data provided -- do not invent stats.
