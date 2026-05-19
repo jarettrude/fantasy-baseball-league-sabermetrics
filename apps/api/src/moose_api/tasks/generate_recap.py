@@ -7,7 +7,7 @@ with cost tracking and content management.
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 
@@ -21,6 +21,7 @@ from moose_api.models.notification import CommissionerNotification
 from moose_api.models.player import Player
 from moose_api.models.recap import Recap
 from moose_api.models.roster import RosterSlot
+from moose_api.models.stats import PlayerValueSnapshot
 from moose_api.models.team import Team
 
 logger = logging.getLogger(__name__)
@@ -140,51 +141,97 @@ def _compute_standings_from_matchups(matchups_list, teams_dict):
     return standings
 
 
-async def _detect_roster_blunders(session, teams_dict, recap_week):
-    """Find players started in active lineup slots while on the IL."""
-    blunders = []
-    # Active lineup slots — anything that isn't bench or IL is a start slot
+async def _detect_deep_cuts(session, teams_dict, recap_week, league):
+    """Find rostered players with low league-wide ownership (< 65%).
+
+    Uses historical PlayerValueSnapshot data scoped to the recap week so
+    the ownership percentage reflects what it was at the time, not today.
+    These are either brilliant flyer picks or complete disasters.
+
+    Batched: loads all roster slots, players, and snapshots in 3 queries
+    instead of per-player round-trips (was N+1 for 12-team × 25-player).
+    """
+    deep_cuts = []
     bench_slots = {"BN", "IL", "IL+", "NA", "DL", "DL+"}
 
-    for team_id, team in teams_dict.items():
-        roster_result = await session.execute(
-            select(RosterSlot).where(
-                RosterSlot.team_id == team_id,
-                RosterSlot.week == recap_week,
-                RosterSlot.is_active.is_(True),
-            )
+    # Approximate the end date of the recap week for historical snapshot lookup.
+    current_week = league.current_week if league.current_week is not None else 1
+    today = datetime.now(UTC).date()
+    current_week_start = today - timedelta(days=today.weekday())
+    recap_week_end = current_week_start - timedelta(weeks=(current_week - recap_week)) + timedelta(days=6)
+    recap_window_start = recap_week_end - timedelta(days=3)
+
+    # --- Batch 1: load all roster slots for all teams in one query ---
+    all_team_ids = list(teams_dict.keys())
+    roster_result = await session.execute(
+        select(RosterSlot).where(
+            RosterSlot.team_id.in_(all_team_ids),
+            RosterSlot.week == recap_week,
+            RosterSlot.is_active.is_(True),
         )
-        slots = roster_result.scalars().all()
+    )
+    all_slots = roster_result.scalars().all()
 
-        for slot in slots:
-            if slot.position in bench_slots:
-                continue
+    # Filter out bench slots and collect player IDs
+    starter_slots: list[tuple] = []  # (team_id, player_id, position)
+    player_ids_needed: set[int] = set()
+    for slot in all_slots:
+        if slot.position in bench_slots:
+            continue
+        starter_slots.append((slot.team_id, slot.player_id, slot.position))
+        player_ids_needed.add(slot.player_id)
 
-            player_result = await session.execute(
-                select(Player).where(Player.id == slot.player_id)
-            )
-            player = player_result.scalar_one_or_none()
-            if not player:
-                continue
+    if not player_ids_needed:
+        return deep_cuts
 
-            # Flag players with IL/DTD/Out/Suspension status started in lineup
-            if player.injury_status and player.injury_status.upper() in (
-                "IL10", "IL15", "IL60", "IL", "OUT", "SUSP",
-            ):
-                blunders.append(
-                    {
-                        "team": team.name,
-                        "player": player.name,
-                        "injury_status": player.injury_status,
-                        "roster_slot": slot.position,
-                        "detail": (
-                            f"Started {player.name} ({player.injury_status}) "
-                            f"in the {slot.position} slot all week"
-                        ),
-                    }
-                )
+    # --- Batch 2: load all players in one query ---
+    player_result = await session.execute(
+        select(Player).where(Player.id.in_(list(player_ids_needed)))
+    )
+    player_map = {p.id: p for p in player_result.scalars().all()}
 
-    return blunders
+    # --- Batch 3: load snapshots for all players in the recap window ---
+    snap_result = await session.execute(
+        select(PlayerValueSnapshot)
+        .where(
+            PlayerValueSnapshot.player_id.in_(list(player_ids_needed)),
+            PlayerValueSnapshot.type == "season",
+            PlayerValueSnapshot.snapshot_date >= recap_window_start,
+            PlayerValueSnapshot.snapshot_date <= recap_week_end,
+        )
+        .order_by(PlayerValueSnapshot.snapshot_date.desc())
+    )
+    # Keep only the latest snapshot per player
+    snap_map: dict[int, PlayerValueSnapshot] = {}
+    for snap in snap_result.scalars():
+        if snap.player_id not in snap_map:
+            snap_map[snap.player_id] = snap
+
+    # --- Fold results in Python ---
+    for team_id, player_id, position in starter_slots:
+        player = player_map.get(player_id)
+        if not player:
+            continue
+
+        snap = snap_map.get(player_id)
+        roster_pct = float(snap.roster_percent) if snap and snap.roster_percent is not None else None
+        if roster_pct is None or roster_pct >= 65.0:
+            continue
+
+        composite = float(snap.composite_value) if snap else None
+        team = teams_dict[team_id]
+
+        deep_cuts.append(
+            {
+                "team": team.name,
+                "player": player.name,
+                "position": position,
+                "roster_percent": round(roster_pct, 1),
+                "composite_value": round(composite, 3) if composite is not None else None,
+            }
+        )
+
+    return deep_cuts
 
 
 async def run_generate_recaps():
@@ -271,8 +318,8 @@ async def run_generate_recaps():
                 season_opener_standings = _compute_standings_from_matchups(wk1_matchups, teams)
 
 
-            # --- Roster blunders (IL players started in active slots) ---
-            roster_blunders = await _detect_roster_blunders(session, teams, recap_week)
+            # --- Deep cuts (low-ownership players in active lineups) ---
+            deep_cuts = await _detect_deep_cuts(session, teams, recap_week, league)
 
             # --- Upset alerts (lower-ranked team beats higher-ranked team) ---
             upsets = []
@@ -334,7 +381,7 @@ async def run_generate_recaps():
                     "standings": standings_data,
                     "previous_week_standings": prev_week_standings,
                     "season_opener_standings": season_opener_standings,
-                    "roster_blunders": roster_blunders,
+                    "deep_cuts": deep_cuts,
                     "upsets": upsets,
                 }
                 await _generate_one_recap(session, league, recap_week, "league", None, league_payload)
@@ -360,28 +407,6 @@ async def run_generate_recaps():
                     None,
                 )
 
-                roster_result = await session.execute(
-                    select(RosterSlot).where(
-                        RosterSlot.team_id == team_id,
-                        RosterSlot.week == recap_week,
-                        RosterSlot.is_active.is_(True),
-                    )
-                )
-                roster_slots = roster_result.scalars().all()
-
-                roster_names = []
-                for slot in roster_slots:
-                    player_result = await session.execute(select(Player).where(Player.id == slot.player_id))
-                    player = player_result.scalar_one_or_none()
-                    if player:
-                        roster_names.append(
-                            {
-                                "name": player.name,
-                                "position": slot.position,
-                                "injury_status": player.injury_status,
-                            }
-                        )
-
                 matchup_detail = None
                 if team_matchup:
                     is_team_a = team_matchup.team_a_id == team_id
@@ -404,9 +429,8 @@ async def run_generate_recaps():
                     "standing": team.standing,
                     "record": {"wins": team.wins, "losses": team.losses, "ties": team.ties},
                     "matchup": matchup_detail,
-                    "roster": roster_names,
                     "league_standings": standings_data,
-                    "your_blunders": [b for b in roster_blunders if b["team"] == team.name],
+                    "your_deep_cuts": [d for d in deep_cuts if d["team"] == team.name],
                 }
 
                 await _generate_one_recap(session, league, recap_week, "manager", team, manager_payload)

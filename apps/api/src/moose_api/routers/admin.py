@@ -533,10 +533,18 @@ async def regenerate_briefing(
     current_user: dict = Depends(require_commissioner),
     db: AsyncSession = Depends(get_db),
 ):
-    """Regenerate a specific briefing using AI."""
+    """Regenerate a specific briefing using the full enrichment pipeline.
+
+    Mirrors the same data assembly as ``generate_briefing._generate_one`` so
+    the regenerated content is as rich as the original daily run.
+    """
     from moose_api.ai.cost_tracker import log_usage
     from moose_api.ai.llm_router import LLMError, generate_text, reset_batch_quota_state
     from moose_api.ai.prompt_loader import build_guarded_prompt
+    from moose_api.services.roster_optimizer import (
+        build_recommendations,
+        recommendations_to_prompt_payload,
+    )
 
     result = await db.execute(select(ManagerBriefing).where(ManagerBriefing.id == briefing_id))
     briefing = result.scalar_one_or_none()
@@ -548,53 +556,72 @@ async def regenerate_briefing(
     if not team:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")
 
-    from moose_api.models.free_agent import FreeAgentSnapshot
-    from moose_api.models.player import Player
-    from moose_api.models.roster import RosterSlot
-    from moose_api.models.stats import PlayerValueSnapshot
+    league_result = await db.execute(select(League).limit(1))
+    league = league_result.scalar_one_or_none()
+    current_week = league.current_week if league and league.current_week is not None else 1
 
-    fa_stmt = (
-        select(PlayerValueSnapshot, Player.name, Player.primary_position)
-        .join(Player, Player.id == PlayerValueSnapshot.player_id)
-        .join(FreeAgentSnapshot, FreeAgentSnapshot.player_id == Player.id)
-        .where(FreeAgentSnapshot.is_available.is_(True))
-        .where(PlayerValueSnapshot.type == "season")
-        .order_by(PlayerValueSnapshot.composite_value.desc())
-        .limit(3)
-    )
-    fa_rows = (await db.execute(fa_stmt)).all()
-    free_agents_data = [
-        {
-            "name": row.name,
-            "position": row.primary_position,
-            "composite_value": float(row.PlayerValueSnapshot.composite_value),
-        }
-        for row in fa_rows
-    ]
+    # --- Full roster optimizer ---
+    rec = await build_recommendations(db, team, league, current_week)
+    payload = recommendations_to_prompt_payload(rec)
 
-    roster_stmt = (
-        select(Player.name, Player.primary_position, Player.injury_status, RosterSlot.position)
-        .join(RosterSlot, RosterSlot.player_id == Player.id)
-        .where(RosterSlot.team_id == team.id)
-        .where(RosterSlot.is_active.is_(True))
-    )
-    roster_rows = (await db.execute(roster_stmt)).all()
-    roster_data = [
-        {
-            "name": r.name,
-            "position": r.primary_position,
-            "roster_spot": r.position,
-            "injury_status": r.injury_status,
-        }
-        for r in roster_rows
-    ]
+    # --- Matchup context ---
+    if league:
+        from moose_api.tasks.generate_briefing import _get_matchup_context, _get_recent_form
+
+        all_teams_result = await db.execute(select(Team))
+        teams_by_id = {t.id: t for t in all_teams_result.scalars().all()}
+
+        matchup_ctx = await _get_matchup_context(db, team, league, current_week, teams_by_id)
+        if matchup_ctx:
+            payload["current_matchup"] = matchup_ctx
+
+        # --- Recent form ---
+        form = await _get_recent_form(db, team, league, current_week)
+        if form:
+            payload["recent_form"] = form
+
+    # --- Hot/cold player trends ---
+    from moose_api.tasks.generate_briefing import _get_hot_cold_trends
+
+    roster_ids = [p["id"] for p in payload.get("roster", []) if p]
+    hot_cold = await _get_hot_cold_trends(db, roster_ids)
+    if hot_cold:
+        id_to_name = {p["id"]: p["name"] for p in payload.get("roster", []) if p}
+        for trend in hot_cold:
+            trend["name"] = id_to_name.get(trend["player_id"], "Unknown")
+        payload["hot_cold_report"] = hot_cold
+
+    # --- Two-start pitchers ---
+    mlb_starts: dict[int, int] = {}
+    try:
+        from moose_api.tasks.recompute_values import _fetch_mlb_starts
+
+        mlb_starts = await _fetch_mlb_starts(days=7)
+    except Exception:
+        pass
+
+    if mlb_starts:
+        from moose_api.tasks.generate_briefing import _identify_two_start_pitchers
+
+        two_starters = _identify_two_start_pitchers(payload.get("roster", []), mlb_starts)
+        if two_starters:
+            payload["two_start_pitchers"] = two_starters
+
+    # --- Vegas odds ---
+    try:
+        from moose_api.services.gambling_service import GamblingService
+        from moose_api.tasks.generate_briefing import _get_vegas_for_roster
+
+        gambling = GamblingService()
+        vegas_probs = await gambling.get_team_win_probabilities()
+        await gambling.close()
+        vegas_flavor = _get_vegas_for_roster(payload.get("roster", []), vegas_probs)
+        if vegas_flavor:
+            payload["vegas_favorable_matchups"] = vegas_flavor
+    except Exception:
+        pass
 
     system_prompt = build_guarded_prompt("morning_briefing.md", {"date": str(briefing.date)})
-    payload = {
-        "team_name": team.name,
-        "roster": roster_data,
-        "top_free_agents": free_agents_data,
-    }
     user_prompt = "Here is the data payload:\n" + json.dumps(payload, indent=2)
 
     try:
@@ -611,7 +638,6 @@ async def regenerate_briefing(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"LLM generation failed: {e}",
         ) from e
-    return briefing
 
 
 @router.get("/recaps/{week}", response_model=list[dict])
@@ -670,7 +696,6 @@ async def regenerate_recap(
     from moose_api.ai.prompt_loader import build_recap_prompt
     from moose_api.models.matchup import Matchup
     from moose_api.models.player import Player
-    from moose_api.models.roster import RosterSlot
 
     result = await db.execute(select(Recap).where(Recap.id == recap_id))
     recap = result.scalar_one_or_none()
@@ -776,30 +801,6 @@ async def regenerate_recap(
             None,
         )
 
-        # Fetch roster for that week
-        roster_result = await db.execute(
-            select(RosterSlot).where(
-                RosterSlot.team_id == team.id,
-                RosterSlot.season == league.season,
-                RosterSlot.week == recap.week,
-                RosterSlot.is_active.is_(True),
-            )
-        )
-        roster_slots = roster_result.scalars().all()
-
-        roster_names = []
-        for slot in roster_slots:
-            player_result = await db.execute(select(Player).where(Player.id == slot.player_id))
-            player = player_result.scalar_one_or_none()
-            if player:
-                roster_names.append(
-                    {
-                        "name": player.name,
-                        "position": slot.position,
-                        "injury_status": player.injury_status,
-                    }
-                )
-
         # Build matchup detail
         matchup_detail = None
         if team_matchup:
@@ -823,7 +824,6 @@ async def regenerate_recap(
             "standing": team_records[team.id]["standing"],
             "record": team_records[team.id],
             "matchup": matchup_detail,
-            "roster": roster_names,
             "league_standings": standings_data,
         }
 

@@ -39,26 +39,27 @@ router = APIRouter(prefix="/players", tags=["players"])
 
 async def _latest_values_for_players(
     db: AsyncSession, player_ids: list[int]
-) -> tuple[dict[int, PlayerValueSnapshot], dict[int, PlayerValueSnapshot]]:
-    """Return the latest season and next_games snapshots for a set of players.
+) -> tuple[dict[int, PlayerValueSnapshot], dict[int, PlayerValueSnapshot], dict[int, PlayerValueSnapshot]]:
+    """Return the latest season, next_games, and rest_of_season snapshots for a set of players.
 
     Performs a single query across both snapshot types and folds the rows
-    into two ``player_id -> snapshot`` dicts, keeping the newest row per
+    into three ``player_id -> snapshot`` dicts, keeping the newest row per
     ``(player_id, type)``. Used instead of per-player lookups to avoid
     N+1 query fan-out on roster/free-agent pages.
 
     Args:
         db: Active async session.
         player_ids: Players whose latest snapshots are needed. Empty input
-            short-circuits to two empty dicts.
+            short-circuits to three empty dicts.
 
     Returns:
-        ``(season_by_player_id, next_games_by_player_id)``.
+        ``(season_by_player_id, next_games_by_player_id, ros_by_player_id)``.
     """
     season_vals: dict[int, PlayerValueSnapshot] = {}
     next_vals: dict[int, PlayerValueSnapshot] = {}
+    ros_vals: dict[int, PlayerValueSnapshot] = {}
     if not player_ids:
-        return season_vals, next_vals
+        return season_vals, next_vals, ros_vals
 
     result = await db.execute(
         select(PlayerValueSnapshot)
@@ -66,11 +67,19 @@ async def _latest_values_for_players(
         .order_by(PlayerValueSnapshot.snapshot_date.desc())
     )
     for snap in result.scalars():
-        bucket = season_vals if snap.type == "season" else next_vals if snap.type == "next_games" else None
-        if bucket is not None and snap.player_id not in bucket:
+        if snap.type == "season":
+            bucket = season_vals
+        elif snap.type == "next_games":
+            bucket = next_vals
+        elif snap.type == "rest_of_season":
+            bucket = ros_vals
+        else:
+            continue
+            
+        if snap.player_id not in bucket:
             bucket[snap.player_id] = snap
 
-    return season_vals, next_vals
+    return season_vals, next_vals, ros_vals
 
 
 def _player_to_response(p: Player) -> PlayerResponse:
@@ -171,7 +180,23 @@ async def get_bench(
     roster_rows = roster_result.all()
 
     player_ids = [player.id for _, player in roster_rows]
-    season_vals, next_vals = await _latest_values_for_players(db, player_ids)
+    season_vals, next_vals, ros_vals = await _latest_values_for_players(db, player_ids)
+
+    from datetime import date, timedelta
+    thirty_days_ago = date.today() - timedelta(days=30)
+    history_result = await db.execute(
+        select(PlayerValueSnapshot.player_id, PlayerValueSnapshot.composite_value)
+        .where(
+            PlayerValueSnapshot.player_id.in_(player_ids),
+            PlayerValueSnapshot.type == "season",
+            PlayerValueSnapshot.snapshot_date >= thirty_days_ago
+        )
+        .order_by(PlayerValueSnapshot.player_id, PlayerValueSnapshot.snapshot_date.asc())
+    )
+    
+    trend_histories: dict[int, list[float]] = {pid: [] for pid in player_ids}
+    for pid, val in history_result:
+        trend_histories[pid].append(float(val))
 
     roster_responses = [
         RosterSlotResponse(
@@ -179,6 +204,8 @@ async def get_bench(
             position=slot.position,
             season_value=_snapshot_to_response(season_vals.get(player.id), player),
             next_games_value=_snapshot_to_response(next_vals.get(player.id), player),
+            rest_of_season_value=_snapshot_to_response(ros_vals.get(player.id), player),
+            trend_history=trend_histories.get(player.id, []),
         )
         for slot, player in roster_rows
     ]
@@ -192,6 +219,11 @@ async def get_bench(
         select(func.max(PlayerValueSnapshot.snapshot_date)).where(PlayerValueSnapshot.type == "next_games")
     )
     max_next_date = max_next_res.scalar_one_or_none()
+
+    max_ros_res = await db.execute(
+        select(func.max(PlayerValueSnapshot.snapshot_date)).where(PlayerValueSnapshot.type == "rest_of_season")
+    )
+    max_ros_date = max_ros_res.scalar_one_or_none()
 
     from moose_api.models.manager_briefing import ManagerBriefing
 
@@ -216,6 +248,7 @@ async def get_bench(
         roster=roster_responses,
         season_value_updated=max_season_date.isoformat() if max_season_date else None,
         next_games_value_updated=max_next_date.isoformat() if max_next_date else None,
+        rest_of_season_value_updated=max_ros_date.isoformat() if max_ros_date else None,
         briefing=briefing_resp,
     )
 
@@ -265,6 +298,7 @@ def _valued_to_schema(vp: ValuedPlayer | None) -> ValuedPlayerResponse | None:
         injury_status=vp.player.injury_status,
         composite_value=vp.composite_value,
         next_games_value=vp.next_games_value,
+        rest_of_season_value=vp.rest_of_season_value,
         our_rank=vp.our_rank,
         yahoo_rank=vp.yahoo_rank,
         roster_slot=vp.roster_slot,
@@ -340,9 +374,15 @@ async def get_free_agents(
     if not league:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="League not found")
 
+    from datetime import datetime, timedelta, UTC
+    cutoff = datetime.now(UTC) - timedelta(hours=24)
+
     subq = (
         select(FreeAgentSnapshot.player_id, func.max(FreeAgentSnapshot.snapshot_at).label("max_snap"))
-        .where(FreeAgentSnapshot.league_id == league.id)
+        .where(
+            FreeAgentSnapshot.league_id == league.id,
+            FreeAgentSnapshot.snapshot_at >= cutoff
+        )
         .group_by(FreeAgentSnapshot.player_id)
         .subquery()
     )
@@ -370,18 +410,20 @@ async def get_free_agents(
         return FreeAgentListResponse(free_agents=[], snapshot_at=None)
 
     player_ids = [r.Player.id for r in rows]
-    season_vals, next_vals = await _latest_values_for_players(db, player_ids)
+    season_vals, next_vals, ros_vals = await _latest_values_for_players(db, player_ids)
 
     fa_responses = []
     for _snap, player in rows:
         season_val = season_vals.get(player.id)
         next_val = next_vals.get(player.id)
+        ros_val = ros_vals.get(player.id)
 
         fa_responses.append(
             FreeAgentResponse(
                 player=_player_to_response(player),
                 season_value=_snapshot_to_response(season_val, player),
                 next_games_value=_snapshot_to_response(next_val, player),
+                rest_of_season_value=_snapshot_to_response(ros_val, player),
                 is_available=True,
             )
         )

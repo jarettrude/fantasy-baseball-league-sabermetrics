@@ -79,6 +79,8 @@ class RosterSlotResponse(BaseModel):
     position: str
     season_value: PlayerValueResponse | None
     next_games_value: PlayerValueResponse | None
+    rest_of_season_value: PlayerValueResponse | None = None
+    trend_history: list[float] | None = None
 
 
 class BenchResponse(BaseModel):
@@ -92,6 +94,7 @@ class BenchResponse(BaseModel):
     roster: list[RosterSlotResponse]
     season_value_updated: datetime | None
     next_games_value_updated: datetime | None
+    rest_of_season_value_updated: datetime | None = None
     briefing: ManagerBriefingResponse | None = None
 
 
@@ -105,6 +108,7 @@ class FreeAgentResponse(BaseModel):
     player: PlayerResponse
     season_value: PlayerValueResponse | None
     next_games_value: PlayerValueResponse | None
+    rest_of_season_value: PlayerValueResponse | None = None
     is_available: bool
 
 
@@ -125,6 +129,7 @@ class ValuedPlayerResponse(BaseModel):
     injury_status: str | None
     composite_value: Decimal
     next_games_value: Decimal | None = None
+    rest_of_season_value: Decimal | None = None
     our_rank: int | None = None
     yahoo_rank: int | None = None
     roster_slot: str | None = None

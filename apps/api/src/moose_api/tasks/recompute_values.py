@@ -2,6 +2,18 @@
 
 Calculates fantasy player values based on advanced metrics, category
 performance, and injury adjustments. Supports season and next-games projections.
+
+Key fixes (2026-05 audit):
+- _load_statline_stats now reads the LATEST cumulative snapshot per player
+  instead of SUM()-ing all daily snapshots (which produced wildly inflated
+  counting stats since StatLine stores season-to-date cumulative totals).
+- Hitter schedule multipliers based on team games next 7 days (previously
+  always 1.0, which meant hitters with 7 games were valued the same as
+  hitters with 3 games).
+- is_pitcher flag is passed through to the valuation engine for sample-size
+  regression.
+- xwOBA/xERA integrated as valuation signal blended into composite when
+  available.
 """
 
 from __future__ import annotations
@@ -10,7 +22,7 @@ import logging
 from datetime import date, timedelta
 
 import httpx
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -21,7 +33,7 @@ from moose_api.core.database import async_session_factory
 from moose_api.models.league import League
 from moose_api.models.notification import CommissionerNotification
 from moose_api.models.player import Player
-from moose_api.models.stats import PlayerValueSnapshot, StatLine
+from moose_api.models.stats import PlayerValueSnapshot, StatLine, ProjectionBaseline
 from moose_api.services.gambling_service import GamblingService
 from moose_api.services.valuation_engine import (
     ComputeZScoresRequest,
@@ -59,80 +71,79 @@ def _stat_field_for_category(display_name: str) -> str | None:
 async def _load_statline_stats(
     session, player_ids: list[int], categories: list[StatCategory]
 ) -> dict[int, dict[str, float]]:
-    """Aggregate in-season stats from the stat_line table.
+    """Load the latest cumulative season snapshot per player from StatLine.
+
+    StatLine rows are season-to-date cumulative snapshots stored daily, keyed
+    by (player_id, game_date, source). The LATEST row per player already
+    contains the full season totals — we must NOT aggregate with SUM() as
+    that would multiply every stat by the number of daily snapshots.
 
     Returns a dict mapping player_id -> {category_display_name: value}.
     """
-    stat_col_map = {
-        "R": StatLine.runs,
-        "HR": StatLine.home_runs,
-        "RBI": StatLine.rbi,
-        "SB": StatLine.stolen_bases,
-        "H": StatLine.hits,
-        "AB": StatLine.at_bats,
-        "W": StatLine.wins,
-        "SV": StatLine.saves,
-        "K": StatLine.strikeouts,
-        "SO": StatLine.strikeouts,
-        "IP": StatLine.innings_pitched,
-        "ER": StatLine.earned_runs,
-        "BB": StatLine.walks,
-    }
+    if not player_ids:
+        return {}
 
-    sum_queries: dict[int, dict[str, float]] = {}
-    for display_name, col in stat_col_map.items():
-        result = await session.execute(
-            select(StatLine.player_id, func.sum(col).label("total"))
-            .where(StatLine.player_id.in_(player_ids))
-            .group_by(StatLine.player_id)
-        )
-        for row in result.all():
-            if row.player_id not in sum_queries:
-                sum_queries[row.player_id] = {}
-            if row.total is not None:
-                sum_queries[row.player_id][display_name] = float(row.total)
-
-    avg_result = await session.execute(
-        select(
-            StatLine.player_id,
-            func.sum(StatLine.hits).label("h"),
-            func.sum(StatLine.at_bats).label("ab"),
-        )
+    # Subquery: get the max game_date per player
+    latest_subq = (
+        select(StatLine.player_id, func.max(StatLine.game_date).label("max_date"))
         .where(StatLine.player_id.in_(player_ids))
         .group_by(StatLine.player_id)
+        .subquery()
     )
-    for row in avg_result.all():
-        if row.ab and row.ab > 0:
-            sum_queries.setdefault(row.player_id, {})["AVG"] = float(row.h or 0) / float(row.ab)
 
-    era_result = await session.execute(
-        select(
-            StatLine.player_id,
-            func.sum(StatLine.earned_runs).label("er"),
-            func.sum(StatLine.innings_pitched).label("ip"),
+    # Join to get the full StatLine rows for the latest date
+    result = await session.execute(
+        select(StatLine).join(
+            latest_subq,
+            and_(
+                StatLine.player_id == latest_subq.c.player_id,
+                StatLine.game_date == latest_subq.c.max_date,
+            ),
         )
-        .where(StatLine.player_id.in_(player_ids))
-        .group_by(StatLine.player_id)
     )
-    for row in era_result.all():
-        if row.ip and float(row.ip) > 0:
-            sum_queries.setdefault(row.player_id, {})["ERA"] = (float(row.er or 0) * 9) / float(row.ip)
+    latest_rows = result.scalars().all()
 
-    whip_result = await session.execute(
-        select(
-            StatLine.player_id,
-            func.sum(StatLine.walks).label("bb"),
-            func.sum(StatLine.hits).label("h"),
-            func.sum(StatLine.innings_pitched).label("ip"),
-        )
-        .where(StatLine.player_id.in_(player_ids))
-        .group_by(StatLine.player_id)
-    )
-    for row in whip_result.all():
-        if row.ip and float(row.ip) > 0:
-            sum_queries.setdefault(row.player_id, {})["WHIP"] = (float(row.bb or 0) + float(row.h or 0)) / float(row.ip)
+    stats_by_player: dict[int, dict[str, float]] = {}
+    for row in latest_rows:
+        pid = row.player_id
+        stats: dict[str, float] = {}
 
-    return sum_queries
+        if row.is_pitcher:
+            ip = float(row.innings_pitched or 0)
+
+            # Pitching counting stats — direct from the cumulative snapshot
+            stats["W"] = int(row.wins or 0)
+            stats["SV"] = int(row.saves or 0)
+            stats["K"] = int(row.strikeouts or 0)
+            stats["SO"] = int(row.strikeouts or 0)
+            stats["IP"] = ip
+            stats["ER"] = int(row.earned_runs or 0)
+            stats["BB"] = int(row.walks or 0)
+
+            # Rate stats — compute from components
+            if ip > 0:
+                stats["ERA"] = (float(row.earned_runs or 0) * 9) / ip
+                stats["WHIP"] = (float(row.walks or 0) + float(row.hits or 0)) / ip
+        else:
+            ab = float(row.at_bats or 0)
+
+            # Hitting counting stats
+            stats["R"] = int(row.runs or 0)
+            stats["HR"] = int(row.home_runs or 0)
+            stats["RBI"] = int(row.rbi or 0)
+            stats["SB"] = int(row.stolen_bases or 0)
+            stats["H"] = int(row.hits or 0)
+            stats["AB"] = int(ab)
+            stats["BB"] = int(row.walks or 0)
+
+            # Rate stats
+            if ab > 0:
+                stats["AVG"] = float(row.hits or 0) / ab
+
+        if stats and any(v != 0 for v in stats.values()):
+            stats_by_player[pid] = stats
+
+    return stats_by_player
 
 
 @retry(
@@ -168,6 +179,44 @@ async def _fetch_mlb_starts(days: int = 7) -> dict[int, int]:
     return starts_by_mlb_id
 
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    reraise=True,
+)
+async def _fetch_team_games_next_7_days() -> dict[str, int]:
+    """Count how many games each MLB team plays in the next 7 days.
+
+    Returns a mapping of team abbreviation -> number of games. Used to
+    create hitter schedule multipliers so that hitters on teams with more
+    games get appropriately higher next-7-day projections.
+    """
+    today = date.today()
+    end_date = today + timedelta(days=6)
+    url = (
+        f"https://statsapi.mlb.com/api/v1/schedule?"
+        f"sportId=1&startDate={today.isoformat()}&endDate={end_date.isoformat()}&hydrate=team"
+    )
+
+    games_by_team: dict[str, int] = {}
+    async with httpx.AsyncClient() as client:
+        try:
+            res = await client.get(url, timeout=10.0)
+            if res.status_code == 200:
+                data = res.json()
+                for date_entry in data.get("dates", []):
+                    for game in date_entry.get("games", []):
+                        for side in ["away", "home"]:
+                            team_info = game.get("teams", {}).get(side, {}).get("team", {})
+                            abbr = team_info.get("abbreviation")
+                            if abbr:
+                                games_by_team[abbr] = games_by_team.get(abbr, 0) + 1
+        except Exception as e:
+            logger.warning("Failed to fetch team schedule: %s", e)
+
+    return games_by_team
+
+
 async def run_recompute_values(snapshot_type: str = "season"):
     try:
         async with async_session_factory() as session:
@@ -198,26 +247,86 @@ async def run_recompute_values(snapshot_type: str = "season"):
             merged_stats: dict[int, dict[str, float]] = {}
             data_sources: dict[int, list[str]] = {}
 
-            for pid in player_ids:
-                sl = statline_stats.get(pid, {})
+            if snapshot_type == "rest_of_season":
+                # Load Steamer projections for ROS instead of using StatLine
+                year = date.today().year
+                proj_result = await session.execute(
+                    select(ProjectionBaseline).where(
+                        ProjectionBaseline.source == "steamer",
+                        ProjectionBaseline.season == year
+                    )
+                )
+                for proj in proj_result.scalars():
+                    pid = proj.player_id
+                    p_stats = proj.projected_stats or {}
+                    
+                    # Map Steamer keys to our Category keys
+                    # e.g., 'SO' -> 'K', 'IP' -> 'innings_pitched'
+                    mapped_stats = {}
+                    for k, v in p_stats.items():
+                        if k == "SO":
+                            mapped_stats["K"] = float(v)
+                        elif k == "IP":
+                            mapped_stats["innings_pitched"] = float(v)
+                        elif k == "AB":
+                            mapped_stats["AB"] = float(v)
+                        else:
+                            try:
+                                mapped_stats[k] = float(v)
+                            except (ValueError, TypeError):
+                                pass
 
-                if has_season_data and sl and any(v != 0 for v in sl.values()):
-                    merged_stats[pid] = sl
-                    data_sources[pid] = ["mlb_api"]
-                else:
-                    merged_stats[pid] = {}
-                    data_sources[pid] = []
+                    merged_stats[pid] = mapped_stats
+                    data_sources[pid] = ["steamer"]
+                
+                has_season_data = len(merged_stats) > 0
+            else:
+                for pid in player_ids:
+                    sl = statline_stats.get(pid, {})
 
-            mlb_starts = {}
-            win_probs = {}
+                    if has_season_data and sl and any(v != 0 for v in sl.values()):
+                        merged_stats[pid] = sl
+                        data_sources[pid] = ["mlb_api"]
+                    else:
+                        merged_stats[pid] = {}
+                        data_sources[pid] = []
+
+            # --- Pre-fetch schedule data for next_games ---
+            mlb_starts: dict[int, int] = {}
+            team_games: dict[str, int] = {}
+            win_probs: dict[str, float] = {}
             if snapshot_type == "next_games":
                 mlb_starts = await _fetch_mlb_starts(days=7)
+                team_games = await _fetch_team_games_next_7_days()
 
                 try:
                     gambling = GamblingService()
                     win_probs = await gambling.get_team_win_probabilities()
                 except Exception as e:
                     logger.warning("Failed to fetch gambling odds: %s", e)
+
+            # --- Load xwOBA/xERA from today's snapshots for signal blending ---
+            today = date.today()
+            xstat_result = await session.execute(
+                select(
+                    PlayerValueSnapshot.player_id,
+                    PlayerValueSnapshot.xwoba,
+                    PlayerValueSnapshot.xera,
+                ).where(
+                    PlayerValueSnapshot.snapshot_date == today,
+                    PlayerValueSnapshot.type == "season",
+                )
+            )
+            xstats_by_player: dict[int, tuple] = {}
+            for row in xstat_result:
+                if row.xwoba is not None or row.xera is not None:
+                    xstats_by_player[row.player_id] = (
+                        float(row.xwoba) if row.xwoba is not None else None,
+                        float(row.xera) if row.xera is not None else None,
+                    )
+
+            # Average games per team in a week (used for normalization)
+            avg_games = sum(team_games.values()) / len(team_games) if team_games else 6.0
 
             player_summaries = []
             for player_id, player in player_map.items():
@@ -227,16 +336,24 @@ async def run_recompute_values(snapshot_type: str = "season"):
 
                 if player_stats:
                     if snapshot_type == "next_games":
-                        starts = mlb_starts.get(player.mlb_id, 0) if player.mlb_id else 0
-                        if player.primary_position == "SP" or "SP" in player.eligible_positions:
-                            if starts >= 2:
-                                multiplier = 1.8
-                            elif starts == 1:
-                                multiplier = 1.0
+                        if player.is_pitcher:
+                            starts = mlb_starts.get(player.mlb_id, 0) if player.mlb_id else 0
+                            if player.primary_position == "SP" or "SP" in player.eligible_positions:
+                                if starts >= 2:
+                                    multiplier = 2.0
+                                elif starts == 1:
+                                    multiplier = 1.0
+                                else:
+                                    multiplier = 0.2 if player.primary_position == "SP" else 1.0
                             else:
-                                multiplier = 0.2 if player.primary_position == "SP" else 1.0
+                                multiplier = 1.0
                         else:
-                            multiplier = 1.0
+                            # Hitter schedule multiplier: scale by games/avg_games
+                            if player.team_abbr and player.team_abbr in team_games:
+                                team_game_count = team_games[player.team_abbr]
+                                multiplier = team_game_count / avg_games
+                            else:
+                                multiplier = 1.0
 
                     if snapshot_type == "next_games" and player.team_abbr in win_probs:
                         prob = win_probs[player.team_abbr]
@@ -245,6 +362,7 @@ async def run_recompute_values(snapshot_type: str = "season"):
                         elif prob <= 0.35:
                             matchup_multiplier = 0.85
 
+                xstat = xstats_by_player.get(player_id, (None, None))
                 player_summaries.append(
                     PlayerStatSummary(
                         player_id=player_id,
@@ -255,6 +373,9 @@ async def run_recompute_values(snapshot_type: str = "season"):
                         schedule_multiplier=multiplier,
                         missed_games_next_7_days=player.missed_games_count or 0,
                         matchup_multiplier=matchup_multiplier,
+                        is_pitcher=player.is_pitcher,
+                        xstat_xwoba=xstat[0],
+                        xstat_xera=xstat[1],
                     )
                 )
 
@@ -277,7 +398,6 @@ async def run_recompute_values(snapshot_type: str = "season"):
             for rank_idx, snap in enumerate(sorted_snaps, start=1):
                 rank_map[snap.player_id] = rank_idx
 
-            today = date.today()
             src_label = "projections" if not has_season_data else "in-season stats"
 
             for snap in response.snapshots:

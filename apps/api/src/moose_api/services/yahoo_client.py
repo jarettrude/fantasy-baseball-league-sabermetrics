@@ -70,6 +70,7 @@ class YahooPlayerData(BaseModel):
     team_abbr: str | None = None
     is_pitcher: bool = False
     yahoo_rank: int | None = None
+    selected_position: str | None = None  # Actual Yahoo lineup slot (BN, Util, SS, SP, IL, etc.)
 
 
 class YahooClient:
@@ -370,6 +371,13 @@ class YahooClient:
                         except (ValueError, TypeError):
                             pass
 
+            # Parse selected_position (the Yahoo lineup slot, e.g. "BN", "Util", "SS")
+            sel_pos_el = player_el.find(".//y:selected_position/y:position", ns)
+            # Fallback: some Yahoo responses use a flat selected_position element
+            if sel_pos_el is None:
+                sel_pos_el = player_el.find(".//y:selected_position", ns)
+            selected_position = sel_pos_el.text if sel_pos_el is not None and sel_pos_el.text else None
+
             return YahooPlayerData(
                 player_key=_pl_text(player_el, "player_key"),
                 player_id=_pl_text(player_el, "player_id"),
@@ -379,6 +387,7 @@ class YahooClient:
                 team_abbr=_pl_text(player_el, "editorial_team_abbr"),
                 is_pitcher=pos in pitcher_positions or bool(set(elig) & pitcher_positions),
                 yahoo_rank=yahoo_rank,
+                selected_position=selected_position,
             )
 
         players = []

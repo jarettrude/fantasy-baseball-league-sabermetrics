@@ -8,8 +8,10 @@
 <script lang="ts">
   import { navigate } from "astro:transitions/client";
   import { onMount } from "svelte";
+  import DOMPurify from "isomorphic-dompurify";
   import { api } from "../lib/api";
   import { fetchUser, getUser } from "../lib/stores.svelte";
+  import Sparkline from "./Sparkline.svelte";
 
   let data: any = $state(null);
   let recommendations: any = $state(null);
@@ -24,6 +26,7 @@
     | "our_rank"
     | "season_value"
     | "next_value"
+    | "ros_value"
     | "xstat"
     | "roster_percent";
   let sortKey = $state<SortKey>("season_value");
@@ -66,6 +69,8 @@
         return Number(slot.season_value?.composite_value ?? -99);
       case "next_value":
         return Number(slot.next_games_value?.composite_value ?? -99);
+      case "ros_value":
+        return Number(slot.rest_of_season_value?.composite_value ?? -99);
       case "roster_percent":
         return Number(slot.season_value?.roster_percent ?? -1);
       case "xstat": {
@@ -310,7 +315,7 @@
         </p>
       </div>
       <div class="prose prose-sm">
-        {@html data.briefing.content || ""}
+        {@html DOMPurify.sanitize(data.briefing.content || "")}
       </div>
     </div>
   {/if}
@@ -517,10 +522,13 @@
               <button type="button"
                 onclick={() => sort("xstat")}
                 class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-text-muted) hover:text-(--color-text) cursor-pointer"
-                title="Expected stats (xwOBA for Hitters, xERA for Pitchers)"
+                title="Expected stats (xwOBA for Hitters, xERA for Pitchers) - underlying metrics that predict future performance better than actuals"
               >
                 xStat{sortIcon("xstat")}
               </button>
+            </th>
+            <th class="px-2 py-2.5 text-center hidden 2xl:table-cell">
+              <span class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-text-muted)" title="Player's strongest and weakest category z-scores">Cat Highlights</span>
             </th>
             <th
               class="px-2 py-2.5 text-center hidden sm:table-cell font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-text-muted)"
@@ -544,6 +552,18 @@
               >
                 Next(7){sortIcon("next_value")}
               </button>
+            </th>
+            <th class="px-2 py-2.5 text-center hidden sm:table-cell">
+              <button type="button"
+                onclick={() => sort("ros_value")}
+                class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-text-muted) hover:text-(--color-text) cursor-pointer"
+                title="Rest of Season Steamer Projected Value"
+              >
+                ROS{sortIcon("ros_value")}
+              </button>
+            </th>
+            <th class="px-2 py-2.5 text-center hidden md:table-cell">
+              <span class="font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-text-muted)" title="30-day historical trend of season composite value">Trend (30d)</span>
             </th>
             <th
               class="px-2 py-2.5 text-center font-mono text-[0.6rem] font-bold tracking-widest uppercase text-(--color-text-muted)"
@@ -612,14 +632,14 @@
                 {#if slot.season_value}
                   {#if ["SP", "RP", "P"].includes(slot.player.primary_position)}
                     {#if slot.season_value.xera !== null && slot.season_value.xera !== undefined}
-                      <span title="Expected ERA (xERA) from Statcast"
+                      <span title="Expected ERA (xERA) from Statcast - lower is better"
                         >{slot.season_value.xera.toFixed(2)}</span
                       >
                     {:else}
                       —
                     {/if}
                   {:else if slot.season_value.xwoba !== null && slot.season_value.xwoba !== undefined}
-                    <span title="Expected wOBA (xwOBA) from Statcast"
+                    <span title="Expected wOBA (xwOBA) from Statcast - higher is better"
                       >{slot.season_value.xwoba.toFixed(3)}</span
                     >
                   {:else}
@@ -627,6 +647,28 @@
                   {/if}
                 {:else}
                   —
+                {/if}
+              </td>
+              <td class="px-2 py-2.5 text-center hidden 2xl:table-cell">
+                {#if slot.season_value && slot.season_value.category_scores && Object.keys(slot.season_value.category_scores).length > 0}
+                  {@const scores = Object.entries(slot.season_value.category_scores).filter(([cat]) => !['R', 'HR', 'RBI', 'SB', 'AVG', 'W', 'SV', 'K', 'ERA', 'WHIP'].includes(cat) === false)}
+                  {@const sorted = scores.sort((a, b) => Number(b[1]) - Number(a[1]))}
+                  {#if sorted.length >= 2}
+                    {@const best = sorted[0]}
+                    {@const worst = sorted[sorted.length - 1]}
+                    <div class="flex flex-col items-center gap-1">
+                      <div class="flex items-center gap-1" title="{best[0]}: +{Number(best[1]).toFixed(2)} z-score">
+                        <span class="font-mono text-[0.55rem] font-bold text-(--color-text-muted)">{best[0]}</span>
+                        <span class="font-mono text-[0.6rem] text-(--color-success)">+{Number(best[1]).toFixed(1)}</span>
+                      </div>
+                      <div class="flex items-center gap-1" title="{worst[0]}: {Number(worst[1]).toFixed(2)} z-score">
+                        <span class="font-mono text-[0.55rem] font-bold text-(--color-text-muted)">{worst[0]}</span>
+                        <span class="font-mono text-[0.6rem] text-(--color-danger)">{Number(worst[1]).toFixed(1)}</span>
+                      </div>
+                    </div>
+                  {/if}
+                {:else}
+                  <span class="font-mono text-xs text-(--color-text-muted)">—</span>
                 {/if}
               </td>
               <td class="px-2 py-2.5 text-center hidden sm:table-cell">
@@ -657,6 +699,23 @@
                 {slot.next_games_value
                   ? Number(slot.next_games_value.composite_value).toFixed(2)
                   : "—"}
+              </td>
+              <td
+                class="px-2 py-2.5 text-center font-mono text-xs font-bold hidden sm:table-cell {Number(
+                  slot.rest_of_season_value?.composite_value ?? 0,
+                ) > 0
+                  ? 'text-(--color-success)'
+                  : Number(slot.rest_of_season_value?.composite_value ?? 0) < 0
+                    ? 'text-(--color-danger)'
+                    : 'text-(--color-text-muted)'}"
+                title="Rest of Season Value"
+              >
+                {slot.rest_of_season_value
+                  ? Number(slot.rest_of_season_value.composite_value).toFixed(2)
+                  : "—"}
+              </td>
+              <td class="px-2 py-2.5 text-center hidden md:table-cell">
+                <Sparkline data={slot.trend_history ?? []} width={50} height={20} />
               </td>
               <td class="px-2 py-2.5 text-center">
                 <span

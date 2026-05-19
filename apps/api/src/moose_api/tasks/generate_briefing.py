@@ -18,7 +18,7 @@ import logging
 import os
 from datetime import UTC, date, datetime, timedelta
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import or_, select
 
 from moose_api.ai.llm_router import generate_text
 from moose_api.ai.prompt_loader import build_guarded_prompt
@@ -108,72 +108,91 @@ async def _get_recent_form(
 async def _get_hot_cold_trends(
     db, roster_player_ids: list[int]
 ) -> list[dict]:
-    """Identify hot and cold players based on last 7 days of StatLine data."""
+    """Identify hot and cold players based on last 7 days of StatLine data.
+
+    ``StatLine`` stores **season-to-date cumulative** snapshots per day, not
+    per-game box scores. To extract the actual 7-day contribution we find the
+    earliest and latest snapshot in the window and subtract.
+    """
     if not roster_player_ids:
         return []
 
     today = date.today()
     seven_days_ago = today - timedelta(days=7)
 
+    # Grab all snapshots in the window — we'll pick min/max per player in Python
+    # to avoid complicated SQL window functions that vary across dialects.
     result = await db.execute(
-        select(
-            StatLine.player_id,
-            StatLine.is_pitcher,
-            func.sum(StatLine.home_runs).label("hr"),
-            func.sum(StatLine.rbi).label("rbi"),
-            func.sum(StatLine.runs).label("r"),
-            func.sum(StatLine.stolen_bases).label("sb"),
-            func.sum(StatLine.hits).label("h"),
-            func.sum(StatLine.at_bats).label("ab"),
-            func.sum(StatLine.strikeouts).label("k"),
-            func.sum(StatLine.innings_pitched).label("ip"),
-            func.sum(StatLine.earned_runs).label("er"),
-            func.sum(StatLine.wins).label("w"),
-            func.sum(StatLine.saves).label("sv"),
-            func.count().label("games"),
-        )
+        select(StatLine)
         .where(
             StatLine.player_id.in_(roster_player_ids),
             StatLine.game_date >= seven_days_ago,
         )
-        .group_by(StatLine.player_id, StatLine.is_pitcher)
+        .order_by(StatLine.player_id, StatLine.game_date.asc())
     )
+    rows = result.scalars().all()
+
+    # Group by (player_id, is_pitcher) — grab first and last snapshot
+    from collections import defaultdict
+
+    player_snaps: dict[tuple[int, bool], list] = defaultdict(list)
+    for row in rows:
+        player_snaps[(row.player_id, row.is_pitcher)].append(row)
 
     trends = []
-    for row in result.all():
-        if row.is_pitcher:
-            ip = float(row.ip or 0)
-            if ip <= 0:
-                continue
-            era_7d = (float(row.er or 0) * 9) / ip
-            parts = [f"{ip:.1f} IP", f"{era_7d:.2f} ERA"]
-            if row.k and row.k >= 6:
-                parts.append(f"{row.k} K")
-            if row.w and row.w >= 1:
-                parts.append(f"{row.w} W")
-            if row.sv and row.sv >= 1:
-                parts.append(f"{row.sv} SV")
+    for (player_id, is_pitcher), snaps in player_snaps.items():
+        if len(snaps) < 2:
+            continue  # Need at least 2 snapshots to compute a delta
 
-            if era_7d <= 2.50 and ip >= 5:
+        earliest = snaps[0]
+        latest = snaps[-1]
+        days_span = (latest.game_date - earliest.game_date).days
+        if days_span < 3:
+            continue  # Not enough spread for a meaningful trend
+
+        if is_pitcher:
+            ip_delta = float(latest.innings_pitched or 0) - float(earliest.innings_pitched or 0)
+            if ip_delta <= 0:
+                continue
+            er_delta = float(latest.earned_runs or 0) - float(earliest.earned_runs or 0)
+            k_delta = int((latest.strikeouts or 0) - (earliest.strikeouts or 0))
+            w_delta = int((latest.wins or 0) - (earliest.wins or 0))
+            sv_delta = int((latest.saves or 0) - (earliest.saves or 0))
+
+            era_7d = (er_delta * 9) / ip_delta
+            parts = [f"{ip_delta:.1f} IP", f"{era_7d:.2f} ERA"]
+            if k_delta >= 6:
+                parts.append(f"{k_delta} K")
+            if w_delta >= 1:
+                parts.append(f"{w_delta} W")
+            if sv_delta >= 1:
+                parts.append(f"{sv_delta} SV")
+
+            if era_7d <= 2.50 and ip_delta >= 5:
                 signal = "hot"
-            elif era_7d >= 6.00 and ip >= 4:
+            elif era_7d >= 6.00 and ip_delta >= 4:
                 signal = "cold"
             else:
                 continue
         else:
-            ab = float(row.ab or 0)
-            if ab < 10:
+            ab_delta = float(latest.at_bats or 0) - float(earliest.at_bats or 0)
+            if ab_delta < 10:
                 continue
-            avg_7d = float(row.h or 0) / ab
-            parts = [f".{int(avg_7d * 1000):03d} AVG ({int(ab)} AB)"]
-            if row.hr and row.hr >= 2:
-                parts.append(f"{row.hr} HR")
-            if row.rbi and row.rbi >= 4:
-                parts.append(f"{row.rbi} RBI")
-            if row.sb and row.sb >= 2:
-                parts.append(f"{row.sb} SB")
+            h_delta = float(latest.hits or 0) - float(earliest.hits or 0)
+            hr_delta = int((latest.home_runs or 0) - (earliest.home_runs or 0))
+            rbi_delta = int((latest.rbi or 0) - (earliest.rbi or 0))
+            sb_delta = int((latest.stolen_bases or 0) - (earliest.stolen_bases or 0))
 
-            if avg_7d >= 0.350 or (row.hr and row.hr >= 3):
+            avg_7d = h_delta / ab_delta
+            parts = [f".{int(avg_7d * 1000):03d} AVG ({int(ab_delta)} AB)"]
+            if hr_delta >= 2:
+                parts.append(f"{hr_delta} HR")
+            if rbi_delta >= 4:
+                parts.append(f"{rbi_delta} RBI")
+            if sb_delta >= 2:
+                parts.append(f"{sb_delta} SB")
+
+            if avg_7d >= 0.350 or hr_delta >= 3:
                 signal = "hot"
             elif avg_7d <= 0.150:
                 signal = "cold"
@@ -181,9 +200,9 @@ async def _get_hot_cold_trends(
                 continue
 
         trends.append({
-            "player_id": row.player_id,
+            "player_id": player_id,
             "signal": signal,
-            "games_last_7d": row.games,
+            "days_span": days_span,
             "highlights": ", ".join(parts),
         })
 
@@ -300,6 +319,41 @@ async def _generate_one(
                 )
                 if vegas_flavor:
                     payload["vegas_favorable_matchups"] = vegas_flavor
+
+                user_prompt = "Here is the data payload:\n" + json.dumps(
+                    payload, indent=2
+                )
+
+                # --- Enrich roster entries with per-player category z-scores ---
+                # This lets the LLM identify which specific players drag down
+                # specific categories, enabling much more targeted analysis.
+                for player_entry in payload.get("roster", []):
+                    if not player_entry:
+                        continue
+                    pid = player_entry.get("id")
+                    if not pid:
+                        continue
+                    from moose_api.models.stats import PlayerValueSnapshot
+                    snap_result = await db.execute(
+                        select(PlayerValueSnapshot)
+                        .where(
+                            PlayerValueSnapshot.player_id == pid,
+                            PlayerValueSnapshot.type == "season",
+                        )
+                        .order_by(PlayerValueSnapshot.snapshot_date.desc())
+                        .limit(1)
+                    )
+                    snap = snap_result.scalar_one_or_none()
+                    if snap and snap.category_scores:
+                        player_entry["category_zscores"] = {
+                            cat: round(float(score), 3)
+                            for cat, score in snap.category_scores.items()
+                        }
+
+                # --- Bench swap suggestions ---
+                if payload.get("bench_swaps"):
+                    # Already serialized by recommendations_to_prompt_payload
+                    pass
 
                 user_prompt = "Here is the data payload:\n" + json.dumps(
                     payload, indent=2
