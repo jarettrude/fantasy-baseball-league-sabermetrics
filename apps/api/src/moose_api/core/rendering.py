@@ -38,6 +38,24 @@ ALLOWED_TAGS: list[str] = [
 ]
 
 
+def _strip_code_fences(text: str) -> str:
+    """Remove wrapping backtick fences that LLMs sometimes add around entire responses.
+
+    Gemini occasionally wraps its whole output in a ```markdown ... ``` or ``` ... ```
+    fence. This strips those outer fences while preserving any intentional inline
+    code spans. Only removes fences that wrap the entire content.
+    """
+    import re
+
+    stripped = text.strip()
+    # Match an optional language tag after the opening fence (e.g. ```markdown)
+    fence_pattern = re.compile(r"^```[a-zA-Z]*\n(.*)\n```$", re.DOTALL)
+    match = fence_pattern.match(stripped)
+    if match:
+        return match.group(1)
+    return text
+
+
 def render_markdown(raw: str | None) -> str | None:
     """Convert raw markdown to sanitized HTML.
 
@@ -45,5 +63,6 @@ def render_markdown(raw: str | None) -> str | None:
     """
     if not raw:
         return None
-    raw_html = markdown.markdown(raw)
-    return bleach.clean(raw_html, tags=ALLOWED_TAGS, strip=True)
+    cleaned = _strip_code_fences(raw)
+    raw_html = markdown.markdown(cleaned, extensions=["tables"])
+    return bleach.clean(raw_html, tags=ALLOWED_TAGS, attributes={"th": ["align"], "td": ["align"]}, strip=True)

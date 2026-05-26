@@ -669,7 +669,7 @@ async def get_admin_recaps(
                 "team_id": r.team_id,
                 "team_name": team_name,
                 "status": r.status,
-                "content": r.content,
+                "content": render_markdown(r.content),
                 "model_used": r.model_used,
                 "provider_used": r.provider_used,
                 "tokens_used": r.tokens_used,
@@ -690,7 +690,12 @@ async def regenerate_recap(
     current_user: dict = Depends(require_commissioner),
     db: AsyncSession = Depends(get_db),
 ):
-    """Regenerate a specific recap using fresh data from the database."""
+    """Regenerate a specific recap by re-running the LLM against its stored stat payload.
+
+    Reuses the stat_payload already stored on the recap so the regeneration
+    receives identical data to the original generation. Only falls back to
+    rebuilding from the database when the stored payload is missing or empty.
+    """
     from moose_api.ai.cost_tracker import estimate_cost, log_usage
     from moose_api.ai.llm_router import LLMError, generate_text, reset_batch_quota_state
     from moose_api.ai.prompt_loader import build_recap_prompt
@@ -706,6 +711,32 @@ async def regenerate_recap(
     league = league_result.scalar_one_or_none()
     if not league:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="League not found")
+
+    # Fast path: reuse the stored stat_payload directly
+    if recap.stat_payload and len(recap.stat_payload) > 2:
+        template = "league_recap.md" if recap.type == "league" else "manager_recap.md"
+        system_prompt, user_prompt = build_recap_prompt(template, recap.stat_payload)
+        try:
+            reset_batch_quota_state()
+            response = await generate_text(user_prompt, system_prompt)
+            recap.content = response.content
+            recap.model_used = response.model
+            recap.provider_used = response.provider
+            recap.tokens_used = response.input_tokens + response.output_tokens
+            recap.cost_usd = estimate_cost(response)
+            recap.status = "published"
+            recap.published_at = datetime.now(UTC)
+            await db.flush()
+            await log_usage(db, response, recap_id=recap.id)
+            await db.commit()
+            return {"status": "regenerated", "recap_id": recap_id}
+        except LLMError as e:
+            recap.status = "failed"
+            await db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"LLM generation failed: {e}",
+            ) from e
 
     matchups_result = await db.execute(
         select(Matchup).where(
@@ -784,10 +815,85 @@ async def regenerate_recap(
             }
         )
     if recap.type == "league":
+        from moose_api.tasks.generate_recap import (
+            _compute_standings_from_matchups,
+            _detect_deep_cuts,
+        )
+
+        # Previous-week standings (all matchups before this week)
+        prev_matchups = [m for m in historical_matchups if m.week < recap.week]
+        prev_week_standings = _compute_standings_from_matchups(prev_matchups, teams) if prev_matchups else []
+
+        # Full weekly standings history (one cumulative snapshot per week)
+        weekly_standings_history: list[dict] = []
+        for w in range(1, recap.week + 1):
+            wk_matchups = [m for m in historical_matchups if m.week <= w]
+            wk_standings = _compute_standings_from_matchups(wk_matchups, teams)
+            weekly_standings_history.append({
+                "after_week": w,
+                "standings": [{"team": s["team"], "standing": s["standing"]} for s in wk_standings],
+            })
+
+        # Deep cuts
+        deep_cuts: list[dict] = []
+        try:
+            deep_cuts = await _detect_deep_cuts(db, teams, recap.week, league)
+        except Exception:
+            pass
+
+        # Upsets (bottom-half beats top-half going into the week)
+        ranking_source = prev_week_standings if prev_week_standings else standings_data
+        team_rank_map = {entry["team"]: entry["standing"] for entry in ranking_source}
+        num_teams = len(team_rank_map)
+        midpoint = num_teams // 2
+        upsets: list[dict] = []
+        for m in matchups:
+            t_a = teams.get(m.team_a_id)
+            t_b = teams.get(m.team_b_id)
+            if not t_a or not t_b:
+                continue
+            a_rank = team_rank_map.get(t_a.name, 999)
+            b_rank = team_rank_map.get(t_b.name, 999)
+            if m.team_a_wins > m.team_b_wins:
+                winner_name, winner_rank, loser_name, loser_rank = t_a.name, a_rank, t_b.name, b_rank
+                winner_cats, loser_cats = m.team_a_wins, m.team_b_wins
+            elif m.team_b_wins > m.team_a_wins:
+                winner_name, winner_rank, loser_name, loser_rank = t_b.name, b_rank, t_a.name, a_rank
+                winner_cats, loser_cats = m.team_b_wins, m.team_a_wins
+            else:
+                continue
+            spread = winner_rank - loser_rank
+            if spread > 0 and loser_rank <= midpoint:
+                upsets.append({
+                    "winner": winner_name,
+                    "winner_entering_rank": winner_rank,
+                    "loser": loser_name,
+                    "loser_entering_rank": loser_rank,
+                    "standings_spread": spread,
+                    "winner_cats": winner_cats,
+                    "loser_cats": loser_cats,
+                })
+        upsets.sort(key=lambda u: u["standings_spread"], reverse=True)
+
+        gems = sorted(
+            [d for d in deep_cuts if (d["composite_value"] or 0) > 0],
+            key=lambda d: d["composite_value"] or 0,
+            reverse=True,
+        )[:4]
+        busts = sorted(
+            [d for d in deep_cuts if (d["composite_value"] or 0) <= 0],
+            key=lambda d: d["composite_value"] or 0,
+        )[:4]
+        league_deep_cuts = gems + busts
+
         stat_payload = {
             "season_week_being_recapped": recap.week,
             "matchups": base_matchup_data,
             "standings": standings_data,
+            "previous_week_standings": prev_week_standings,
+            "weekly_standings_history": weekly_standings_history,
+            "deep_cuts": league_deep_cuts,
+            "upsets": upsets,
         }
     else:
         # Manager recap - need team-specific data

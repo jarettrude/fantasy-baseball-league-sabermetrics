@@ -451,20 +451,20 @@ class WorkerSettings:
         cron(sync_league_meta, hour={0, 6, 12, 18}, minute=0),
         cron(sync_matchups, minute={0, 15, 30, 45}),
         cron(sync_roster, hour={0, 6, 12, 18}, minute=10),
-        cron(sync_free_agents, hour=2, minute=45, run_at_startup=True),
+        cron(sync_free_agents, hour=2, minute=45, run_at_startup=True, timeout=900),
         cron(sync_rotowire_injuries, hour={0, 6, 12, 18}, minute=30),
         cron(sync_injury_status, hour={0, 6, 12, 18}, minute=45),
         cron(sync_roster_trends, hour=3, minute=15, run_at_startup=True),
-        cron(load_live_season_stats_job, hour=1, minute=0, run_at_startup=True),
-        cron(load_mlb_roster_data, hour=1, minute=30),
-        cron(recompute_season_values, hour=4, minute=0, run_at_startup=True),
+        cron(load_live_season_stats_job, hour=1, minute=0, run_at_startup=True, timeout=900),
+        cron(load_mlb_roster_data, hour=1, minute=30, timeout=900),
+        cron(recompute_season_values, hour=4, minute=0, run_at_startup=True, timeout=900),
         cron(recompute_next_games_values, hour=4, minute=15, run_at_startup=True),
         cron(sync_advanced_metrics_job, hour=4, minute=30),
         cron(purge_session_logs, hour=3, minute=0),
         cron(purge_ai_prompt_raw, hour=3, minute=0),
         cron(purge_free_agent_snapshots, hour=3, minute=30),
-        cron(generate_briefings, hour=6, minute=30),
-        cron(generate_weekly_recaps, weekday=1, hour=7, minute=0),  # Monday 7 AM
+        cron(generate_briefings, hour=6, minute=30, timeout=900),
+        cron(generate_weekly_recaps, weekday=1, hour=7, minute=0, timeout=900),  # Monday 7 AM
     ]
 
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
