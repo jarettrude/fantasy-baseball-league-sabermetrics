@@ -257,13 +257,8 @@
 
                 <div class="p-4">
                   {#if recap.content}
-                    <div class="relative">
-                      <div class="hidden"></div>
-                      <p
-                        class="font-mono text-xs text-(--color-text-muted) whitespace-pre-wrap line-clamp-6"
-                      >
-                        {recap.content}
-                      </p>
+                    <div class="prose prose-sm min-w-0 line-clamp-6">
+                      {@html recap.content}
                     </div>
                   {:else}
                     <p class="font-mono text-xs text-(--color-danger)">
@@ -336,13 +331,8 @@
 
                 <div class="p-4">
                   {#if recap.content}
-                    <div class="relative">
-                      <div class="hidden"></div>
-                      <p
-                        class="font-mono text-xs text-(--color-text-muted) whitespace-pre-wrap line-clamp-6"
-                      >
-                        {recap.content}
-                      </p>
+                    <div class="prose prose-sm min-w-0 line-clamp-6">
+                      {@html recap.content}
                     </div>
                   {:else}
                     <p class="font-mono text-xs text-(--color-danger)">

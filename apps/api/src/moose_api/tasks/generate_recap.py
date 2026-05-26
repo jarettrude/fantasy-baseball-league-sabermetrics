@@ -293,29 +293,32 @@ async def run_generate_recaps():
                     }
                 )
 
-            # --- Previous week standings (for week-over-week movement) ---
+            # --- Historical matchups for standings history ---
+            all_historical_result = await session.execute(
+                select(Matchup).where(
+                    Matchup.league_id == league.id,
+                    Matchup.week <= recap_week,
+                )
+            )
+            all_historical_matchups = all_historical_result.scalars().all()
+
+            # --- Previous week standings (for upset detection) ---
             prev_week_standings = []
             if recap_week > 1:
-                prev_matchups_result = await session.execute(
-                    select(Matchup).where(
-                        Matchup.league_id == league.id,
-                        Matchup.week <= recap_week - 1,
-                    )
-                )
-                prev_matchups = prev_matchups_result.scalars().all()
+                prev_matchups = [m for m in all_historical_matchups if m.week <= recap_week - 1]
                 prev_week_standings = _compute_standings_from_matchups(prev_matchups, teams)
 
-            # --- Season opener standings (after week 1 only, for arc narratives) ---
-            season_opener_standings = []
-            if recap_week > 2:
-                wk1_matchups_result = await session.execute(
-                    select(Matchup).where(
-                        Matchup.league_id == league.id,
-                        Matchup.week == 1,
-                    )
-                )
-                wk1_matchups = wk1_matchups_result.scalars().all()
-                season_opener_standings = _compute_standings_from_matchups(wk1_matchups, teams)
+            # --- Weekly standings history (full arc, one entry per completed week) ---
+            # Gives the model visibility into roller-coaster trends, flukes correcting,
+            # sustained rises/falls, and multi-week momentum shifts.
+            weekly_standings_history = []
+            for w in range(1, recap_week + 1):
+                week_matchups = [m for m in all_historical_matchups if m.week <= w]
+                week_standings = _compute_standings_from_matchups(week_matchups, teams)
+                weekly_standings_history.append({
+                    "after_week": w,
+                    "standings": [{"team": s["team"], "standing": s["standing"]} for s in week_standings],
+                })
 
 
             # --- Deep cuts (low-ownership players in active lineups) ---
@@ -375,13 +378,25 @@ async def run_generate_recaps():
                 )
             )
             if not existing_league.scalar_one_or_none():
+                # Cap deep cuts: top 4 hidden gems + top 4 worst busts by composite value
+                gems = sorted(
+                    [d for d in deep_cuts if (d["composite_value"] or 0) > 0],
+                    key=lambda d: d["composite_value"] or 0,
+                    reverse=True,
+                )[:4]
+                busts = sorted(
+                    [d for d in deep_cuts if (d["composite_value"] or 0) <= 0],
+                    key=lambda d: d["composite_value"] or 0,
+                )[:4]
+                league_deep_cuts = gems + busts
+
                 league_payload = {
                     "season_week_being_recapped": recap_week,
                     "matchups": base_matchup_data,
                     "standings": standings_data,
                     "previous_week_standings": prev_week_standings,
-                    "season_opener_standings": season_opener_standings,
-                    "deep_cuts": deep_cuts,
+                    "weekly_standings_history": weekly_standings_history,
+                    "deep_cuts": league_deep_cuts,
                     "upsets": upsets,
                 }
                 await _generate_one_recap(session, league, recap_week, "league", None, league_payload)
