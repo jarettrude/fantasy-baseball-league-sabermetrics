@@ -700,7 +700,6 @@ async def regenerate_recap(
     from moose_api.ai.llm_router import LLMError, generate_text, reset_batch_quota_state
     from moose_api.ai.prompt_loader import build_recap_prompt
     from moose_api.models.matchup import Matchup
-    from moose_api.models.player import Player
 
     result = await db.execute(select(Recap).where(Recap.id == recap_id))
     recap = result.scalar_one_or_none()
@@ -712,8 +711,32 @@ async def regenerate_recap(
     if not league:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="League not found")
 
-    # Fast path: reuse the stored stat_payload directly
-    if recap.stat_payload and len(recap.stat_payload) > 2:
+    # Fast path: reuse the stored stat_payload only if it contains the full
+    # set of keys required for the prompt. Older recaps may be missing new
+    # fields like weekly_standings_history, so we rebuild them instead.
+    required_keys = {
+        "league": {
+            "season_week_being_recapped",
+            "matchups",
+            "standings",
+            "previous_week_standings",
+            "weekly_standings_history",
+            "deep_cuts",
+            "upsets",
+        },
+        "manager": {
+            "season_week_being_recapped",
+            "manager_team",
+            "standing",
+            "record",
+            "matchup",
+            "league_standings",
+            "weekly_standings_history",
+            "your_deep_cuts",
+        },
+    }
+    type_keys = required_keys.get(recap.type, set())
+    if recap.stat_payload and type_keys.issubset(recap.stat_payload.keys()):
         template = "league_recap.md" if recap.type == "league" else "manager_recap.md"
         system_prompt, user_prompt = build_recap_prompt(template, recap.stat_payload)
         try:
@@ -774,73 +797,45 @@ async def regenerate_recap(
     )
     historical_matchups = historical_matchups_result.scalars().all()
 
-    team_records = {team_id: {"wins": 0, "losses": 0, "ties": 0} for team_id in teams}
-    for m in historical_matchups:
-        if m.team_a_wins > m.team_b_wins:
-            if m.team_a_id in team_records:
-                team_records[m.team_a_id]["wins"] += 1
-            if m.team_b_id in team_records:
-                team_records[m.team_b_id]["losses"] += 1
-        elif m.team_b_wins > m.team_a_wins:
-            if m.team_b_id in team_records:
-                team_records[m.team_b_id]["wins"] += 1
-            if m.team_a_id in team_records:
-                team_records[m.team_a_id]["losses"] += 1
-        else:
-            if m.team_a_id in team_records:
-                team_records[m.team_a_id]["ties"] += 1
-            if m.team_b_id in team_records:
-                team_records[m.team_b_id]["ties"] += 1
-
-    sorted_teams = sorted(
-        teams.values(),
-        key=lambda t: (
-            -team_records[t.id]["wins"],
-            team_records[t.id]["losses"],
-            -team_records[t.id]["ties"],
-        ),
+    from moose_api.tasks.generate_recap import (
+        _compute_standings_from_matchups,
+        _detect_deep_cuts,
     )
+
+    # Current standings come from the authoritative Team model, exactly matching
+    # the initial generation in generate_recap.py.
     standings_data = []
-    for rank, team in enumerate(sorted_teams, 1):
-        record = team_records[team.id]
-        team_records[team.id]["standing"] = rank
+    for team in sorted(teams.values(), key=lambda t: t.standing or 999):
         standings_data.append(
             {
-                "team_id": team.id,
-                "team_name": team.name,
-                "standing": rank,
-                "wins": record["wins"],
-                "losses": record["losses"],
-                "ties": record["ties"],
+                "team": team.name,
+                "standing": team.standing,
+                "wins": team.wins,
+                "losses": team.losses,
+                "ties": team.ties,
             }
         )
+
+    # Previous-week standings (all matchups before this week)
+    prev_matchups = [m for m in historical_matchups if m.week < recap.week]
+    prev_week_standings = _compute_standings_from_matchups(prev_matchups, teams) if prev_matchups else []
+
+    # Full weekly standings history (one cumulative snapshot per week)
+    weekly_standings_history: list[dict] = []
+    for w in range(1, recap.week + 1):
+        wk_matchups = [m for m in historical_matchups if m.week <= w]
+        wk_standings = _compute_standings_from_matchups(wk_matchups, teams)
+        weekly_standings_history.append({
+            "after_week": w,
+            "standings": [{"team": s["team"], "standing": s["standing"]} for s in wk_standings],
+        })
+
+    # Deep cuts are used for both league and manager recaps
+    deep_cuts: list[dict] = []
+    with contextlib.suppress(Exception):
+        deep_cuts = await _detect_deep_cuts(db, teams, recap.week, league)
+
     if recap.type == "league":
-        from moose_api.tasks.generate_recap import (
-            _compute_standings_from_matchups,
-            _detect_deep_cuts,
-        )
-
-        # Previous-week standings (all matchups before this week)
-        prev_matchups = [m for m in historical_matchups if m.week < recap.week]
-        prev_week_standings = _compute_standings_from_matchups(prev_matchups, teams) if prev_matchups else []
-
-        # Full weekly standings history (one cumulative snapshot per week)
-        weekly_standings_history: list[dict] = []
-        for w in range(1, recap.week + 1):
-            wk_matchups = [m for m in historical_matchups if m.week <= w]
-            wk_standings = _compute_standings_from_matchups(wk_matchups, teams)
-            weekly_standings_history.append({
-                "after_week": w,
-                "standings": [{"team": s["team"], "standing": s["standing"]} for s in wk_standings],
-            })
-
-        # Deep cuts
-        deep_cuts: list[dict] = []
-        try:
-            deep_cuts = await _detect_deep_cuts(db, teams, recap.week, league)
-        except Exception:
-            pass
-
         # Upsets (bottom-half beats top-half going into the week)
         ranking_source = prev_week_standings if prev_week_standings else standings_data
         team_rank_map = {entry["team"]: entry["standing"] for entry in ranking_source}
@@ -927,10 +922,12 @@ async def regenerate_recap(
         stat_payload = {
             "season_week_being_recapped": recap.week,
             "manager_team": team.name,
-            "standing": team_records[team.id]["standing"],
-            "record": team_records[team.id],
+            "standing": team.standing,
+            "record": {"wins": team.wins, "losses": team.losses, "ties": team.ties},
             "matchup": matchup_detail,
             "league_standings": standings_data,
+            "weekly_standings_history": weekly_standings_history,
+            "your_deep_cuts": [d for d in deep_cuts if d["team"] == team.name],
         }
 
     # Also update the stored stat_payload so future regenerations work
