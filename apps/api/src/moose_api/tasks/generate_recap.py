@@ -445,6 +445,7 @@ async def run_generate_recaps():
                     "record": {"wins": team.wins, "losses": team.losses, "ties": team.ties},
                     "matchup": matchup_detail,
                     "league_standings": standings_data,
+                    "weekly_standings_history": weekly_standings_history,
                     "your_deep_cuts": [d for d in deep_cuts if d["team"] == team.name],
                 }
 

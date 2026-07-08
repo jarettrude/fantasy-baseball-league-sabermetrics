@@ -10,6 +10,7 @@ Write a brief personal recap addressed to this manager about their matchup this 
 - `record` — season win-loss-tie record.
 - `matchup` — their head-to-head result this week with full category breakdown.
 - `league_standings` — full league standings for context.
+- `weekly_standings_history` — a season-by-week snapshot of every team's standing after each completed week. Use this to tell the full story of this manager's season arc: a rising star climbing from the basement, a top-tier juggernaut that never falters, a roller-coaster team that swings wildly, or a slow-motion collapse. Reference specific weeks when you make these points (e.g., "3rd in week 4, down to 8th by week 15").
 - `your_deep_cuts` — a list of players this manager started in active lineup slots who are rostered in fewer than 65% of leagues. Each entry has `player`, `position`, `roster_percent`, and `composite_value`. A positive composite value with low ownership means they found a hidden gem most managers are sleeping on. A negative composite value with low ownership means they are starting someone the rest of the league has correctly identified as droppable. If non-empty, react accordingly. If empty, this manager is running a conventional roster — no deep cuts to discuss.
 
 ## What to produce
@@ -18,7 +19,8 @@ Write a brief personal recap addressed to this manager about their matchup this 
 2. **Best performers.** Highlight their top 2-3 players who carried the load. Give credit where due.
 3. **Category analysis.** Which categories did they win convincingly? Which did they lose badly? Were there any categories lost by razor-thin margins that could have swung the result?
 4. **Deep cut check.** If `your_deep_cuts` is non-empty, comment on their unconventional roster choices. Praise the genius picks (positive composite value) and question the questionable ones (negative composite value). Frame it as: "Are you a waiver-wire wizard or just throwing darts blindfolded?"
-5. **Closing chirp or encouragement.** End with something memorable — congratulate a strong week with a backhanded compliment, or console a bad week with a reality check.
+5. **Manager's season arc.** Use `weekly_standings_history` to describe this team's journey through the season. Look for sustained rises ("rising star"), consistent dominance at the top ("top-tier mainstay" — and roast them when they slip), wild week-to-week swings ("roller-coaster"), or a brutal slide from grace ("slow-motion collapse"). Cite specific week numbers and standings positions. Do not invent trends; a single week's blip is not a narrative.
+6. **Closing chirp or encouragement.** End with something memorable — congratulate a strong week with a backhanded compliment, or console a bad week with a reality check.
 
 ## Tone calibration
 
