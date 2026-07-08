@@ -4,10 +4,12 @@ Provides intelligent failover between multiple LLM providers (Google AI Studio,
 OpenRouter) with automatic quota exhaustion detection and fallback strategies.
 Implements retry logic and cost optimization for reliable AI text generation.
 
-Model tier strategy (2026-05 audit):
-- Primary: Gemini 2.5 Flash (thinking model, best reasoning) — 5 RPM, 20 RPD
-- Fallback 1: Gemini 3.1 Flash Lite (fast, high quota) — 15 RPM, 500 RPD
-- Fallback 2: OpenRouter (external, metered) — last resort
+Model tier strategy (2026-07 audit):
+- Primary: Gemini 3.5 Flash (stable frontier model) — ~10 RPM
+- Fallback 1: Gemini 2.5 Flash (hybrid reasoning, 1M context) — ~10 RPM
+- Fallback 2: Gemini 3.1 Flash-Lite (fast, high quota) — ~15 RPM
+- Fallback 3: Gemini 2.5 Flash-Lite (extra high quota) — ~15 RPM
+- Last resort: OpenRouter (external, metered)
 """
 
 from __future__ import annotations
@@ -35,7 +37,6 @@ class BatchQuotaState:
     def __init__(self):
         self.exhausted = {
             "gemini-3.5-flash": False,
-            "gemini-3-flash": False,
             "gemini-2.5-flash": False,
             "gemini-3.1-flash-lite": False,
             "gemini-2.5-flash-lite": False,
@@ -67,11 +68,10 @@ class ModelRateLimiter:
         self._last_request_time: dict[str, float] = {}
         # Minimum spacing between requests (60 / RPM + small safety buffer)
         self._min_spacing: dict[str, float] = {
-            "gemini-3.5-flash": 13.0,       # 5 RPM -> 12s + 1s buffer
-            "gemini-3-flash": 13.0,         # 5 RPM -> 12s + 1s buffer
-            "gemini-2.5-flash": 13.0,       # 5 RPM -> 12s + 1s buffer
+            "gemini-3.5-flash": 6.5,        # 10 RPM -> 6s + 0.5s buffer
+            "gemini-2.5-flash": 6.5,        # 10 RPM -> 6s + 0.5s buffer
             "gemini-3.1-flash-lite": 4.5,   # 15 RPM -> 4s + 0.5s buffer
-            "gemini-2.5-flash-lite": 6.5,   # 10 RPM -> 6s + 0.5s buffer
+            "gemini-2.5-flash-lite": 4.5,   # 15 RPM -> 4s + 0.5s buffer
         }
 
     def _get_lock(self, model: str) -> asyncio.Lock:
@@ -180,7 +180,7 @@ class LLMError(Exception):
 
 
 async def _call_gemini(
-    prompt: str, system_prompt: str = "", model: str = "gemini-2.5-flash"
+    prompt: str, system_prompt: str = "", model: str = "gemini-3.5-flash"
 ) -> LLMResponse:
     """Call Gemini API with proper systemInstruction separation.
 
@@ -292,12 +292,12 @@ async def _call_openrouter(prompt: str, system_prompt: str = "") -> LLMResponse:
 async def generate_text(prompt: str, system_prompt: str = "") -> LLMResponse:
     """Generate text using a tiered LLM strategy.
 
-    Tier 1: Gemini 2.5 Flash (120 RPD, reliable, no thinking issues)
-    Tier 2: Gemini 3.1 Flash Lite (500 RPD, high quota)
-    Tier 3: Gemini 3.5 Flash (20 RPD, thinking disabled)
-    Tier 4: Gemini 3 Flash (20 RPD)
-    Tier 5: Gemini 2.5 Flash Lite (20 RPD)
-    Tier 6: OpenRouter (external fallback)
+    Free-tier model order (2026-07):
+    Tier 1: Gemini 3.5 Flash (stable frontier, ~10 RPM / ~1,500 RPD)
+    Tier 2: Gemini 2.5 Flash (hybrid reasoning, ~10 RPM / ~250 RPD)
+    Tier 3: Gemini 3.1 Flash-Lite (high quota, ~15 RPM / ~1,000 RPD)
+    Tier 4: Gemini 2.5 Flash-Lite (extra high quota, ~15 RPM / ~1,000 RPD)
+    Tier 5: OpenRouter (external fallback)
 
     Each tier has automatic quota exhaustion detection. Once a tier is
     marked exhausted for the current batch, subsequent calls skip directly
@@ -305,10 +305,9 @@ async def generate_text(prompt: str, system_prompt: str = "") -> LLMResponse:
     """
     last_error = None
     models_to_try = [
+        "gemini-3.5-flash",
         "gemini-2.5-flash",
         "gemini-3.1-flash-lite",
-        "gemini-3.5-flash",
-        "gemini-3-flash",
         "gemini-2.5-flash-lite",
     ]
 
