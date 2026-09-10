@@ -1,0 +1,121 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SignupForm from "../components/SignupForm.astro";
+import Logo from "../components/Logo.astro";
+---
+
+<BaseLayout
+  title="Moose Sports Empire — Sabermetrics-Powered Fantasy Baseball"
+  description="Fantasy baseball analytics powered by advanced sabermetrics. League data, AI-powered recaps, matchup predictions, and more. Sign up for the 2027 season."
+>
+  <!-- ═══ HERO ═══ -->
+  <section class="hero" aria-labelledby="hero-heading">
+    <div class="container">
+      <Logo class="hero-logo" />
+
+      <h1 id="hero-heading">Moose Sports Empire</h1>
+      <p class="hero-tagline">
+        Sabermetrics-powered fantasy baseball analytics. League data, AI recaps, and matchup predictions &mdash; all in one place.
+      </p>
+      <p class="hero-notice">
+        <svg class="hero-notice-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+        </svg>
+        Rebuilding for the 2027 season
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══ FEATURES ═══ -->
+  <section class="features section" aria-labelledby="features-heading">
+    <div class="container">
+      <h2 id="features-heading" class="sr-only">What&rsquo;s Coming</h2>
+      <ul class="features-grid" role="list">
+        <!-- Flagship Asymmetric Card -->
+        <li class="feature-card feature-card-featured">
+          <div class="feature-card-content">
+            <div class="feature-header-top">
+              <span class="feature-icon feature-icon-lg" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                  <rect width="18" height="18" x="3" y="3" rx="2"/>
+                  <path d="M3 9h18M9 21V9"/>
+                </svg>
+              </span>
+              <span class="feature-badge">Command Center</span>
+            </div>
+            <h3>League Dashboard</h3>
+            <p>Live standings, head-to-head records, waiver tracking, and multi-season historical trends for your entire league in one unified, fast-loading view.</p>
+          </div>
+
+          <!-- Micro Standings Preview Visual -->
+          <div class="dashboard-preview" aria-hidden="true">
+            <div class="preview-header">
+              <span class="preview-title">Pennant Race</span>
+              <span class="preview-tag">Season Standings</span>
+            </div>
+            <div class="preview-table">
+              <div class="preview-row preview-row-header">
+                <span>Club</span>
+                <span>W-L</span>
+                <span>GB</span>
+                <span>Diff</span>
+              </div>
+              <div class="preview-row preview-row-leader">
+                <span class="team-name"><span class="rank-num">1</span> Pine Tar Nomads</span>
+                <span>88-42</span>
+                <span>—</span>
+                <span class="stat-plus">+142</span>
+              </div>
+              <div class="preview-row">
+                <span class="team-name"><span class="rank-num">2</span> Moonshot Dynamos</span>
+                <span>81-49</span>
+                <span>7.0</span>
+                <span class="stat-plus">+88</span>
+              </div>
+              <div class="preview-row">
+                <span class="team-name"><span class="rank-num">3</span> Southpaw Sluggers</span>
+                <span>76-54</span>
+                <span>12.0</span>
+                <span class="stat-plus">+41</span>
+              </div>
+            </div>
+            <div class="preview-chips">
+              <span class="preview-chip">H2H Matrices</span>
+              <span class="preview-chip">Playoff Leverage</span>
+              <span class="preview-chip">All-Time History</span>
+            </div>
+          </div>
+        </li>
+
+        <!-- Secondary Card 1 -->
+        <li class="feature-card">
+          <span class="feature-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M5.5 4.5c2 2.5 3 5 3 7.5s-1 5-3 7.5"/>
+              <path d="M18.5 4.5c-2 2.5-3 5-3 7.5s1 5 3 7.5"/>
+              <path d="m7.5 7 1.5.5M7 12h2M7.5 17l1.5-.5M16.5 7l-1.5.5M17 12h-2M16.5 17l-1.5-.5"/>
+            </svg>
+          </span>
+          <h3>Sabermetrics Engine</h3>
+          <p>Advanced metrics including wRC+, FIP, Statcast barrel rates, and customized WAR projections baked into every player evaluation.</p>
+        </li>
+
+        <!-- Secondary Card 2 -->
+        <li class="feature-card">
+          <span class="feature-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/>
+              <path d="M19 4v4m2-2h-4"/>
+            </svg>
+          </span>
+          <h3>AI-Powered Recaps</h3>
+          <p>Automated morning briefings, weekly matchup summaries, and draft analysis written by intelligence that follows your league every day.</p>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ═══ SIGNUP ═══ -->
+  <SignupForm />
+</BaseLayout>

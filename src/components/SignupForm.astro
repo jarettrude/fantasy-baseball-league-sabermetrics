@@ -1,0 +1,134 @@
+---
+const WEB3FORMS_KEY = "21169593-3fbb-47e6-8295-d8d3efe595c4";
+---
+
+<section class="signup section" id="signup" aria-labelledby="signup-heading">
+  <div class="container">
+    <h2 id="signup-heading">Get on the Roster</h2>
+    <p class="signup-subtitle">
+      Sign up to be first in line when we relaunch for the 2027 season.
+    </p>
+
+    <div class="form-wrapper">
+      <form
+        id="signup-form"
+        action="https://api.web3forms.com/submit"
+        method="POST"
+        novalidate
+      >
+        <!-- Web3Forms access key -->
+        <input type="hidden" name="access_key" value={WEB3FORMS_KEY} />
+
+        <!-- Honeypot spam protection -->
+        <input
+          type="checkbox"
+          name="botcheck"
+          class="sr-only"
+          style="display:none"
+          tabindex="-1"
+          autocomplete="off"
+          aria-hidden="true"
+        />
+
+        <!-- Custom subject line -->
+        <input type="hidden" name="subject" value="New Signup — Moose Sports Empire 2027" />
+
+        <!-- Redirect disabled (we handle it via JS) -->
+        <input type="hidden" name="redirect" value="https://web3forms.com/success" />
+
+        <div class="form-group">
+          <label for="name">Name</label>
+          <input
+            type="text"
+            id="name"
+            name="name"
+            placeholder="Shohei Ohtani"
+            required
+            autocomplete="name"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            placeholder="shohei@baseball.com"
+            required
+            autocomplete="email"
+          />
+        </div>
+
+        <button type="submit" class="submit-btn" id="submit-btn">
+          Count Me In
+        </button>
+
+        <div class="form-feedback" id="form-feedback" role="status" aria-live="polite"></div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<script>
+  const form = document.getElementById("signup-form") as HTMLFormElement;
+  const btn = document.getElementById("submit-btn") as HTMLButtonElement;
+  const feedback = document.getElementById("form-feedback") as HTMLDivElement;
+
+  form.addEventListener("submit", async (e: Event) => {
+    e.preventDefault();
+
+    // Client-side validation
+    const name = (form.querySelector("#name") as HTMLInputElement).value.trim();
+    const email = (form.querySelector("#email") as HTMLInputElement).value.trim();
+
+    if (!name || !email) {
+      showFeedback("Please fill in both fields.", "error");
+      return;
+    }
+
+    if (!isValidEmail(email)) {
+      showFeedback("Please enter a valid email address.", "error");
+      return;
+    }
+
+    // Submit
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner" aria-hidden="true"></span> Sending…';
+
+    try {
+      const res = await fetch("https://api.web3forms.com/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(Object.fromEntries(new FormData(form))),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        showFeedback("You're on the roster! We'll be in touch before next season.", "success");
+        form.reset();
+      } else {
+        showFeedback(data.message || "Something went wrong. Please try again.", "error");
+      }
+    } catch {
+      showFeedback("Network error. Please check your connection and try again.", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Count Me In";
+    }
+  });
+
+  function showFeedback(message: string, type: "success" | "error") {
+    const icon = type === "success"
+      ? '<svg class="feedback-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>'
+      : '<svg class="feedback-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+    feedback.innerHTML = `${icon}<span>${message}</span>`;
+    feedback.className = `form-feedback ${type}`;
+    feedback.setAttribute("data-visible", "true");
+  }
+
+  function isValidEmail(email: string): boolean {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+</script>
