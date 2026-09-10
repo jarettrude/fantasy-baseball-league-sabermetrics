@@ -1,0 +1,13 @@
+---
+
+
+
+import DashboardView from "../components/DashboardView.svelte";
+import AppLayout from "../layouts/AppLayout.astro";
+---
+
+<AppLayout title="Dashboard">
+  <div class="space-y-6">
+    <DashboardView client:load />
+  </div>
+</AppLayout>

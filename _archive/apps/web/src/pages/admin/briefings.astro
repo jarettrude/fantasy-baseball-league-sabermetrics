@@ -1,0 +1,15 @@
+---
+
+
+
+import AdminBriefingsView from "../../components/AdminBriefingsView.svelte";
+import AdminNav from "../../components/AdminNav.svelte";
+import AppLayout from "../../layouts/AppLayout.astro";
+---
+
+<AppLayout title="Admin Briefings" noindex={true}>
+  <div class="space-y-6">
+    <AdminNav currentPath="/admin/briefings" />
+    <AdminBriefingsView client:load />
+  </div>
+</AppLayout>

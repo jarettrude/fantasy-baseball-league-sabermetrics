@@ -1,0 +1,37 @@
+{
+	"name": "@moose/web",
+	"type": "module",
+	"version": "0.1.0",
+	"private": true,
+	"scripts": {
+		"dev": "astro dev",
+		"build": "astro build",
+		"start": "node ./dist/server/entry.mjs",
+		"preview": "astro preview",
+		"typecheck": "astro check && svelte-check --tsconfig ./tsconfig.json",
+		"lint": "pnpm typecheck && pnpm lint:biome",
+		"lint:biome": "biome lint .",
+		"format": "biome format --write .",
+		"format:check": "biome format .",
+		"check": "biome check .",
+		"astro": "astro"
+	},
+	"dependencies": {
+		"@astrojs/node": "^10.1.1",
+		"@astrojs/svelte": "^8.1.1",
+		"@tailwindcss/typography": "^0.5.19",
+		"@tailwindcss/vite": "^4.3.0",
+		"astro": "^6.3.3",
+		"isomorphic-dompurify": "^3.13.0",
+		"lodash": "4.17.23",
+		"server-destroy": "^1.0.1",
+		"svelte": "^5.55.7",
+		"tailwindcss": "^4.3.0"
+	},
+	"devDependencies": {
+		"@astrojs/check": "^0.9.9",
+		"@biomejs/biome": "^2.4.15",
+		"svelte-check": "^4.4.8",
+		"typescript": "^5.9.3"
+	}
+}
