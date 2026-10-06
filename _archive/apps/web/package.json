@@ -17,21 +17,21 @@
 		"astro": "astro"
 	},
 	"dependencies": {
-		"@astrojs/node": "^10.1.1",
-		"@astrojs/svelte": "^8.1.1",
-		"@tailwindcss/typography": "^0.5.19",
-		"@tailwindcss/vite": "^4.3.0",
-		"astro": "^6.3.3",
-		"isomorphic-dompurify": "^3.13.0",
-		"lodash": "4.17.23",
+		"@astrojs/node": "^11.1.6",
+		"@astrojs/svelte": "^9.0.1",
+		"@tailwindcss/typography": "^0.5.20",
+		"@tailwindcss/vite": "^4.3.3",
+		"astro": "^7.3.5",
+		"isomorphic-dompurify": "^4.4.0",
+		"lodash": "4.18.1",
 		"server-destroy": "^1.0.1",
-		"svelte": "^5.55.7",
-		"tailwindcss": "^4.3.0"
+		"svelte": "^5.57.1",
+		"tailwindcss": "^4.3.3"
 	},
 	"devDependencies": {
-		"@astrojs/check": "^0.9.9",
-		"@biomejs/biome": "^2.4.15",
-		"svelte-check": "^4.4.8",
-		"typescript": "^5.9.3"
+		"@astrojs/check": "^0.9.10",
+		"@biomejs/biome": "^2.5.15",
+		"svelte-check": "^4.7.6",
+		"typescript": "^6.0.3"
 	}
 }
