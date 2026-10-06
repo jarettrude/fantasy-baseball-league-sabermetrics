@@ -1,0 +1,28 @@
+services:
+  nginx:
+    container_name: moose_sports_empire
+    image: nginx:1.27-alpine
+    restart: always
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ${DOCKER_DIR}/appdata/moose_sports_empire/html:/usr/share/nginx/html:ro
+      - ${DOCKER_DIR}/appdata/moose_sports_empire/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - proxy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.moose_sports_empire.rule=Host(`moosesportsempire.ca`) || Host(`www.moosesportsempire.ca`)"
+      - "traefik.http.routers.moose_sports_empire.entrypoints=websecure"
+      - "traefik.http.routers.moose_sports_empire.tls.certresolver=cloudflare"
+      - "traefik.http.services.moose_sports_empire.loadbalancer.server.port=80"
+      - "traefik.http.routers.moose_sports_empire.middlewares=www-redirect@file,secure-headers@file"
+
+networks:
+  proxy:
+    external: true
