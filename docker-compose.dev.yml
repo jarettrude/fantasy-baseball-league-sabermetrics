@@ -62,7 +62,7 @@ services:
       APP_ENV: ${APP_ENV:-development}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       WEB_ORIGIN: ${WEB_ORIGIN:-https://localhost}
-      LOCAL_TIMEZONE: ${LOCAL_TIMEZONE:-America/Vancouver}
+      LOCAL_TIMEZONE: ${LOCAL_TIMEZONE:-America/New_York}
       RECAP_GENERATION_TIME: ${RECAP_GENERATION_TIME:-10:00}
       DEMO_MODE: ${DEMO_MODE:-false}
       YAHOO_REDIRECT_URI: ${YAHOO_REDIRECT_URI:-https://localhost/callback}
@@ -109,7 +109,7 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-development}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      LOCAL_TIMEZONE: ${LOCAL_TIMEZONE:-America/Vancouver}
+      LOCAL_TIMEZONE: ${LOCAL_TIMEZONE:-America/New_York}
       RECAP_GENERATION_TIME: ${RECAP_GENERATION_TIME:-10:00}
       DEMO_MODE: ${DEMO_MODE:-false}
       YAHOO_REDIRECT_URI: ${YAHOO_REDIRECT_URI:-https://localhost/callback}

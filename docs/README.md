@@ -1,5 +1,8 @@
 # Moose Sports Empire
 
+> **Note / Disclaimer**: Due to Yahoo restricting developer access to their API, this project is archived as a portfolio example. It is not actively deployed — configuration values shown here are placeholders, not a live environment.
+
+
 The ultimate fantasy baseball companion platform that transforms your league experience with AI-powered insights, real-time matchup analysis, and automated recaps. Stop juggling spreadsheets and start dominating your league with intelligent tools that do the heavy lifting for you.
 
 ---

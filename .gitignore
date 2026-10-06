@@ -18,12 +18,15 @@ pnpm-debug.log*
 .env.*
 !.env.example
 
-# secrets & archives
-_archive/secrets/
-_archive/**/.venv/
-_archive/**/__pycache__/
-_archive/**/.ruff_cache/
+# secrets & local certs
 secrets/
+infra/traefik/certs/
+
+# python artifacts
+**/.venv/
+**/__pycache__/
+**/.ruff_cache/
+**/.pytest_cache/
 
 # editor & OS
 .DS_Store

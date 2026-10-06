@@ -13,10 +13,10 @@ export default defineConfig({
 			alias: {},
 		},
 		server: {
-			allowedHosts: ["moosesportsempire.ca"],
+			allowedHosts: ["example.com"],
 		},
 	},
-	site: "https://moosesportsempire.ca",
+	site: "https://example.com",
 	server: {
 		port: 4321,
 		host: true,

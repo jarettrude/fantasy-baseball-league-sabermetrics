@@ -63,7 +63,7 @@ def _get_cookie_domain() -> str | None:
     """Extract the root domain from web_origin for cross-subdomain cookies.
 
     Examples:
-        https://moosesportsempire.ca -> .moosesportsempire.ca
+        https://your-domain.com -> .your-domain.com
         https://localhost -> None (no domain for localhost)
     """
     parsed = urlparse(settings.web_origin)

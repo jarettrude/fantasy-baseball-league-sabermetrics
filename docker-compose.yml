@@ -50,7 +50,7 @@ services:
       APP_ENV: production
       LOG_LEVEL: INFO
       WEB_ORIGIN: https://your-domain.com
-      LOCAL_TIMEZONE: America/Vancouver
+      LOCAL_TIMEZONE: America/New_York
       RECAP_GENERATION_TIME: "10:00"
       DEMO_MODE: "false"
       YAHOO_REDIRECT_URI: https://your-domain.com/callback
@@ -109,7 +109,7 @@ services:
     environment:
       APP_ENV: production
       LOG_LEVEL: INFO
-      LOCAL_TIMEZONE: America/Vancouver
+      LOCAL_TIMEZONE: America/New_York
       RECAP_GENERATION_TIME: "10:00"
       DEMO_MODE: "false"
       YAHOO_REDIRECT_URI: https://your-domain.com/callback
