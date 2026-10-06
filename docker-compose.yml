@@ -1,5 +1,7 @@
 # Production Docker Compose Template
 # Copy this file to your production environment and customize the variables
+# Expects secrets in ./secrets/ (extensionless filenames) and named volumes
+# for persistent data — no external directory layout required.
 
 services:
   db:
@@ -14,7 +16,7 @@ services:
     secrets:
       - db_password
     volumes:
-      - ${DOCKER_DIR}/appdata/moose_sports_empire/postgres:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
     networks:
       - moose_sports_internal
     healthcheck:
@@ -29,7 +31,7 @@ services:
     restart: always
     command: ["redis-server", "--save", "60 1", "--loglevel", "warning"]
     volumes:
-      - ${DOCKER_DIR}/appdata/moose_sports_empire/redis:/data
+      - redisdata:/data
     networks:
       - moose_sports_internal
     healthcheck:
@@ -41,7 +43,7 @@ services:
   api:
     container_name: moose-sports-api
     build:
-      context: ${DOCKER_DIR}/sources/moose_sports_empire
+      context: .
       dockerfile: apps/api/Dockerfile
       target: api
     image: moose_sports_api:latest
@@ -55,9 +57,10 @@ services:
       DEMO_MODE: "false"
       YAHOO_REDIRECT_URI: https://your-domain.com/callback
       REDIS_URL: redis://redis:6379/0
+      # Password here is a placeholder — the app injects the db_password secret at runtime
       DATABASE_URL: postgresql+asyncpg://moose:password@db:5432/moose_empire
     volumes:
-      - ${DOCKER_DIR}/sources/moose_sports_empire/prompts:/prompts:rw
+      - ./prompts:/prompts:rw
     depends_on:
       db:
         condition: service_healthy
@@ -99,12 +102,12 @@ services:
   worker:
     container_name: moose-sports-worker
     build:
-      context: ${DOCKER_DIR}/sources/moose_sports_empire
+      context: .
       dockerfile: apps/api/Dockerfile
       target: worker
     image: moose_sports_worker:latest
     volumes:
-      - ${DOCKER_DIR}/sources/moose_sports_empire/prompts:/prompts:ro
+      - ./prompts:/prompts:ro
     restart: unless-stopped
     environment:
       APP_ENV: production
@@ -114,6 +117,7 @@ services:
       DEMO_MODE: "false"
       YAHOO_REDIRECT_URI: https://your-domain.com/callback
       REDIS_URL: redis://redis:6379/0
+      # Password here is a placeholder — the app injects the db_password secret at runtime
       DATABASE_URL: postgresql+asyncpg://moose:password@db:5432/moose_empire
     depends_on:
       db:
@@ -144,7 +148,7 @@ services:
   web:
     container_name: moose-sports-web
     build:
-      context: ${DOCKER_DIR}/sources/moose_sports_empire
+      context: .
       dockerfile: apps/web/Dockerfile
       args:
         - PUBLIC_API_URL=https://api.your-domain.com
@@ -182,28 +186,32 @@ networks:
   moose_sports_internal:
     driver: bridge
 
+volumes:
+  pgdata:
+  redisdata:
+
 secrets:
   yahoo_league_id:
-    file: ${DOCKER_DIR}/secrets/moose_sports_empire/yahoo_league_id
+    file: ./secrets/yahoo_league_id
   yahoo_client_id:
-    file: ${DOCKER_DIR}/secrets/moose_sports_empire/yahoo_client_id
+    file: ./secrets/yahoo_client_id
   yahoo_client_secret:
-    file: ${DOCKER_DIR}/secrets/moose_sports_empire/yahoo_client_secret
+    file: ./secrets/yahoo_client_secret
   commissioner_yahoo_guid:
-    file: ${DOCKER_DIR}/secrets/moose_sports_empire/commissioner_yahoo_guid
+    file: ./secrets/commissioner_yahoo_guid
   jwt_secret_key:
-    file: ${DOCKER_DIR}/secrets/moose_sports_empire/jwt_secret_key
+    file: ./secrets/jwt_secret_key
   fernet_key:
-    file: ${DOCKER_DIR}/secrets/moose_sports_empire/fernet_key
+    file: ./secrets/fernet_key
   google_gemini_api_key:
-    file: ${DOCKER_DIR}/secrets/moose_sports_empire/google_gemini_api_key
+    file: ./secrets/google_gemini_api_key
   openrouter_api_key:
-    file: ${DOCKER_DIR}/secrets/moose_sports_empire/openrouter_api_key
+    file: ./secrets/openrouter_api_key
   the_odds_api_key:
-    file: ${DOCKER_DIR}/secrets/moose_sports_empire/the_odds_api_key
+    file: ./secrets/the_odds_api_key
   session_secret:
-    file: ${DOCKER_DIR}/secrets/moose_sports_empire/session_secret
+    file: ./secrets/session_secret
   csrf_secret:
-    file: ${DOCKER_DIR}/secrets/moose_sports_empire/csrf_secret
+    file: ./secrets/csrf_secret
   db_password:
-    file: ${DOCKER_DIR}/secrets/moose_sports_empire/db_password
+    file: ./secrets/db_password

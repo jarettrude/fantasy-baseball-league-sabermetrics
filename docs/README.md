@@ -1,6 +1,6 @@
 # Moose Sports Empire
 
-> **Note / Disclaimer**: Due to Yahoo restricting developer access to their API, this project is archived as a portfolio example. It is not actively deployed — configuration values shown here are placeholders, not a live environment.
+> **Note / Disclaimer**: Due to Yahoo restricting developer access to their API, this project is archived as an example. It is not actively deployed — configuration values shown here are placeholders, not a live environment. Use at your own risk.
 
 
 The ultimate fantasy baseball companion platform that transforms your league experience with AI-powered insights, real-time matchup analysis, and automated recaps. Stop juggling spreadsheets and start dominating your league with intelligent tools that do the heavy lifting for you.
@@ -19,6 +19,9 @@ This guide walks you through deploying the Moose Sports Empire platform to your 
 - Linux VPS (Ubuntu 22.04+ recommended)
 - **Docker** and **Docker Compose** installed
 - **Traefik** already running and configured
+  - Must have `web` and `websecure` entrypoints and a `letsencrypt` certificate resolver
+  - Must be attached to an external Docker network named `proxy` (`docker network create proxy` if needed)
+  - Must have a `secure-headers` middleware defined via the file provider (see Traefik Configuration below)
 - At least 2GB RAM, 1 CPU core
 - 20GB+ storage space
 
@@ -78,12 +81,12 @@ openssl req -x509 -newkey rsa:4096 -keyout infra/traefik/certs/local-key.pem \
 **Note**: Your browser will warn about self-signed certificates - this is normal for development. Click "Advanced" and "Proceed to localhost" to continue.
 
 ### Step 4: Configure Your Domain (Production Only)
-Edit your production `docker-compose.yml` and update these environment variables:
+Edit your production `docker-compose.yml` and update these environment variables (spread across the `api`, `worker`, and `web` services — `PUBLIC_API_URL` on `web` must also be changed in its `build.args` since it is baked into the frontend bundle at build time):
 
 ```yaml
 environment:
-  WEB_ORIGIN: https://your-domain.com          # Your main domain
-  PUBLIC_API_URL: https://api.your-domain.com  # Your API subdomain
+  WEB_ORIGIN: https://your-domain.com          # Your main domain (api service)
+  PUBLIC_API_URL: https://api.your-domain.com  # Your API subdomain (web service)
   YAHOO_REDIRECT_URI: https://your-domain.com/callback
   LOCAL_TIMEZONE: America/New_York            # Your timezone
 ```
@@ -100,7 +103,9 @@ labels:
 ### Step 5: Setup Secrets
 
 #### Development Setup (Local)
-Create the following files in `secrets/` with `.txt` extensions:
+Create the following files in `secrets/` with `.txt` extensions.
+
+**Quick option**: `just secrets-init` scaffolds all of these automatically — it generates the random keys and writes `REPLACE_ME` placeholders for the Yahoo/API key files (without overwriting anything that already exists). To do it manually instead:
 
 ```bash
 # Yahoo OAuth (get from https://developer.yahoo.com/apps/)
@@ -128,71 +133,42 @@ echo "your_commissioner_yahoo_guid" > secrets/commissioner_yahoo_guid.txt
 > **Note**: Development uses `.txt` extensions while production uses extensionless files. This prevents accidentally using development secrets in production without intentionally renaming the files.
 
 #### Production Setup (VPS)
-Create extensionless files in `${DOCKER_DIR}/secrets/moose_sports_empire/`:
+Create extensionless files in `secrets/` (same directory as dev, different filenames — run from the repo root):
 
 ```bash
-# Create production secrets directory
-mkdir -p ${DOCKER_DIR}/secrets/moose_sports_empire
-
 # Yahoo OAuth
-echo "your_production_yahoo_client_id" > ${DOCKER_DIR}/secrets/moose_sports_empire/yahoo_client_id
-echo "your_production_yahoo_client_secret" > ${DOCKER_DIR}/secrets/moose_sports_empire/yahoo_client_secret
-echo "your_production_yahoo_league_id" > ${DOCKER_DIR}/secrets/moose_sports_empire/yahoo_league_id
+echo "your_production_yahoo_client_id" > secrets/yahoo_client_id
+echo "your_production_yahoo_client_secret" > secrets/yahoo_client_secret
+echo "your_production_yahoo_league_id" > secrets/yahoo_league_id
 
 # Security Keys (generate fresh production keys)
-openssl rand -base64 48 | tr -d '\n' > ${DOCKER_DIR}/secrets/moose_sports_empire/jwt_secret_key
-openssl rand -base64 48 | tr -d '\n' > ${DOCKER_DIR}/secrets/moose_sports_empire/session_secret
-openssl rand -base64 48 | tr -d '\n' > ${DOCKER_DIR}/secrets/moose_sports_empire/csrf_secret
+openssl rand -base64 48 | tr -d '\n' > secrets/jwt_secret_key
+openssl rand -base64 48 | tr -d '\n' > secrets/session_secret
+openssl rand -base64 48 | tr -d '\n' > secrets/csrf_secret
 
 # Fernet Key for database encryption
-uv run --project /path/to/moose_sports_empire/apps/api python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())" > ${DOCKER_DIR}/secrets/moose_sports_empire/fernet_key
+uv run --project apps/api python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())" > secrets/fernet_key
 
 # API Keys
-echo "your_production_google_gemini_api_key" > ${DOCKER_DIR}/secrets/moose_sports_empire/google_gemini_api_key
-echo "your_production_openrouter_api_key" > ${DOCKER_DIR}/secrets/moose_sports_empire/openrouter_api_key
-echo "your_production_the_odds_api_key" > ${DOCKER_DIR}/secrets/moose_sports_empire/the_odds_api_key
+echo "your_production_google_gemini_api_key" > secrets/google_gemini_api_key
+echo "your_production_openrouter_api_key" > secrets/openrouter_api_key
+echo "your_production_the_odds_api_key" > secrets/the_odds_api_key
 
 # Commissioner Yahoo GUID (gatekeeping - must be set before deployment)
-echo "your_commissioner_yahoo_guid" > ${DOCKER_DIR}/secrets/moose_sports_empire/commissioner_yahoo_guid
+echo "your_commissioner_yahoo_guid" > secrets/commissioner_yahoo_guid
 
 # Production database password (secure!)
-echo "secure_db_password" > ${DOCKER_DIR}/secrets/moose_sports_empire/db_password
-```
+echo "secure_db_password" > secrets/db_password
 
-### Step 5.5: Create Production Environment File
-
-Create a `.env` file in the root directory of your moose_sports_empire clone:
-
-```bash
-# Create .env file for docker-compose
-nano .env
-```
-
-Add the following content (adjust paths for your setup):
-
-```bash
-# Docker directory paths
-DOCKER_DIR=/path/to/your/docker/setup
-```
-
-**Why this is needed**: The production `docker-compose.yml` uses `${DOCKER_DIR}` variables for volume paths and secret locations. Creating this `.env` file ensures docker-compose can automatically resolve these paths without requiring manual exports each time you run commands.
-
-**Example setup**:
-```bash
-# If your docker setup is at /opt/docker
-DOCKER_DIR=/opt/docker
-
-# The full paths will resolve to:
-# /opt/docker/appdata/moose_sports_empire/postgres
-# /opt/docker/secrets/moose_sports_empire/yahoo_client_id
-# etc.
+# Restrict permissions — these files are mounted into containers
+chmod 600 secrets/*
 ```
 
 ### Step 6: Deploy!
 
 #### Production Deployment:
 ```bash
-# Build and start all services (.env file provides DOCKER_DIR)
+# Build and start all services (run from the repo root)
 docker compose up -d --build
 
 # Watch the logs to see migrations run
@@ -210,6 +186,8 @@ docker compose -f docker-compose.dev.yml logs -f api
 # Access at https://localhost (Traefik handles HTTPS)
 ```
 
+> **Tip**: Common dev tasks are wrapped in the `justfile` — run `just --list` to see them (e.g. `just up`, `just logs`, `just secrets-init`).
+
 That's it! Your app should be live at your domain (production) or localhost (development).
 
 ---
@@ -221,46 +199,34 @@ That's it! Your app should be live at your domain (production) or localhost (dev
 | Feature | Development | Production |
 |---------|-------------|------------|
 | **Docker Compose** | `docker-compose.dev.yml` | `docker-compose.yml` |
-| **Dockerfile** | `Dockerfile.dev` | `Dockerfile` |
+| **Dockerfile** | `Dockerfile.dev` (API) | `Dockerfile` |
 | **Database** | Simple credentials (moose/moose) | Secure password via secrets |
 | **Network** | Traefik HTTPS (localhost) | Traefik reverse proxy |
-| **Volumes** | Hot reload mounts | Persistent data only |
+| **Volumes** | API hot reload mounts* | Persistent data only |
 | **SSL** | Traefik self-signed HTTPS | Traefik auto-HTTPS |
-| **Secrets** | Local files | Production secret paths |
+| **Secrets** | Local files (`./secrets/*.txt`) | Production secret paths |
 
-### Traefik Router Configuration (Production Only)
+\* The web container serves the pre-built `dist/` bundle, so frontend changes require a rebuild (`docker compose -f docker-compose.dev.yml up -d --build web`) or running `pnpm dev` outside Docker. API code hot-reloads via uvicorn `--reload`.
 
-Add these routes to your Traefik dynamic configuration:
+### Traefik Configuration (Production Only)
+
+Routing is already handled by the `labels` in `docker-compose.yml` via Traefik's Docker provider — no router/service entries are needed in your dynamic configuration.
+
+However, the labels reference a `secure-headers` middleware from the file provider (`secure-headers@file`). Define it in your Traefik dynamic configuration, or the routers will fail:
 
 ```yaml
-# traefik/dynamic/moose-sports.yml
+# traefik/dynamic/middlewares.yml
 http:
-  routers:
-    moose-web:
-      rule: "Host(`your-domain.com`) || Host(`www.your-domain.com`)"
-      service: "moose-web"
-      entryPoints: ["websecure"]
-      tls:
-        certResolver: "letsencrypt"
-
-    moose-api:
-      rule: "Host(`api.your-domain.com`)"
-      service: "moose-api"
-      entryPoints: ["websecure"]
-      tls:
-        certResolver: "letsencrypt"
-
-  services:
-    moose-web:
-      loadBalancer:
-        servers:
-          - url: "http://localhost:4321"  # Web container port
-
-    moose-api:
-      loadBalancer:
-        servers:
-          - url: "http://localhost:8000"  # API container port
+  middlewares:
+    secure-headers:
+      headers:
+        frameDeny: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: "strict-origin-when-cross-origin"
 ```
+
+Alternatively, remove the two `traefik.http.routers.*.middlewares=secure-headers@file` labels from `docker-compose.yml`.
 
 ### Environment Variables Reference
 
@@ -379,8 +345,10 @@ grep WEB_ORIGIN docker-compose.yml
 # Check database health
 docker compose exec db pg_isready -U moose
 
-# Reset database (WARNING: deletes data)
-docker compose down -v
+# Reset database (WARNING: deletes data — named volumes are dropped)
+docker compose -f docker-compose.dev.yml down -v   # development
+docker compose down -v                            # production
+
 docker compose up -d
 ```
 

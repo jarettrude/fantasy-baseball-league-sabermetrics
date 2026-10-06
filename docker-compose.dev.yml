@@ -1,6 +1,6 @@
 # Development Docker Compose
 # This file is for LOCAL DEVELOPMENT ONLY
-# For production deployment, use docker-compose.prod.yml as a template
+# For production deployment, use docker-compose.yml as a template
 # 
 # Development features:
 # - Local Traefik with HTTPS for Yahoo OAuth

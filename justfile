@@ -1,47 +1,86 @@
 set dotenv-load
 
+# Recipes target the DEV compose file by default.
+# For production, override: COMPOSE="docker compose" just up
+compose := env_var_or_default("COMPOSE", "docker compose -f docker-compose.dev.yml")
+
 default:
     @just --list
 
 # ── Docker ────────────────────────────────────────────────
 up:
-    docker compose up -d --build
+    {{compose}} up -d --build
 
 down:
-    docker compose down
+    {{compose}} down
 
 logs service="api":
-    docker compose logs -f {{service}}
+    {{compose}} logs -f {{service}}
 
 restart service="api":
-    docker compose restart {{service}}
+    {{compose}} restart {{service}}
 
 ps:
-    docker compose ps
+    {{compose}} ps
+
+# ── Secrets ───────────────────────────────────────────────
+# Scaffold local dev secrets in ./secrets/ — never overwrites existing files.
+# Random keys are generated; Yahoo/API key files get REPLACE_ME placeholders.
+secrets-init:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p secrets
+    write_secret() {
+        local data
+        data=$(cat)
+        if [ -f "secrets/$1.txt" ]; then
+            echo "  skip secrets/$1.txt (exists)"
+        else
+            printf '%s' "$data" > "secrets/$1.txt"
+            echo "  wrote secrets/$1.txt"
+        fi
+    }
+    write_placeholder() {
+        if [ -f "secrets/$1.txt" ]; then
+            echo "  skip secrets/$1.txt (exists)"
+        else
+            echo "REPLACE_ME" > "secrets/$1.txt"
+            echo "  wrote secrets/$1.txt (placeholder — fill in)"
+        fi
+    }
+    echo "Scaffolding local dev secrets in ./secrets/ ..."
+    openssl rand -base64 48 | tr -d '\n' | write_secret jwt_secret_key
+    openssl rand -base64 48 | tr -d '\n' | write_secret session_secret
+    openssl rand -base64 48 | tr -d '\n' | write_secret csrf_secret
+    (cd apps/api && uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())") | write_secret fernet_key
+    for name in yahoo_client_id yahoo_client_secret yahoo_league_id commissioner_yahoo_guid google_gemini_api_key openrouter_api_key the_odds_api_key; do
+        write_placeholder "$name"
+    done
+    echo "Done — fill in the REPLACE_ME files, then: {{compose}} up -d --build"
 
 # ── Database ──────────────────────────────────────────────
 db-shell:
-    docker compose exec db psql -U moose -d moose_empire
+    {{compose}} exec db psql -U moose -d moose_empire
 
 db-migrate message="auto":
-    docker compose exec api alembic revision --autogenerate -m "{{message}}"
+    {{compose}} exec api alembic revision --autogenerate -m "{{message}}"
 
 db-upgrade:
-    docker compose exec api alembic upgrade head
+    {{compose}} exec api alembic upgrade head
 
 db-downgrade:
-    docker compose exec api alembic downgrade -1
+    {{compose}} exec api alembic downgrade -1
 
 db-reset:
-    docker compose down -v
-    docker compose up -d db redis
+    {{compose}} down -v
+    {{compose}} up -d db redis
     @echo "Waiting for DB..."
     sleep 3
-    docker compose up -d api worker web
+    {{compose}} up -d api worker web
 
 # ── Backend ───────────────────────────────────────────────
 api-shell:
-    docker compose exec api bash
+    {{compose}} exec api bash
 
 api-lint:
     cd apps/api && uv run ruff check src/
@@ -50,11 +89,11 @@ api-format:
     cd apps/api && uv run ruff format src/
 
 api-test:
-    docker compose exec api pytest tests/ -v
+    {{compose}} exec api pytest tests/ -v
 
 # ── Frontend ──────────────────────────────────────────────
 web-shell:
-    docker compose exec web sh
+    {{compose}} exec web sh
 
 web-lint:
     cd apps/web && pnpm lint
@@ -64,7 +103,7 @@ web-build:
 
 # ── Worker ────────────────────────────────────────────────
 worker-logs:
-    docker compose logs -f worker
+    {{compose}} logs -f worker
 
 # ── Sync Jobs (manual trigger) ────────────────────────────
 sync-league:
@@ -102,13 +141,13 @@ migrate:
     fi
     # Connectivity check
     echo "Checking database connectivity..."
-    docker compose exec db pg_isready -U moose -d moose_empire -t 10
+    {{compose}} exec db pg_isready -U moose -d moose_empire -t 10
     if [ $? -ne 0 ]; then
         echo "ERROR: Database is not reachable. Aborting migration."
         exit 1
     fi
     echo "Database is ready. Running migrations..."
-    docker compose exec api alembic upgrade head
+    {{compose}} exec api alembic upgrade head
     echo "Migrations complete."
 
 # `just generate-types` — per spec §3.1:
@@ -131,12 +170,12 @@ setup:
     @echo "Installing frontend dependencies..."
     pnpm install
     @echo "Building Docker images..."
-    docker compose build
+    {{compose}} build
     @echo "Starting services..."
-    docker compose up -d
+    {{compose}} up -d
     @echo "Waiting for services..."
     sleep 5
     @echo "Running initial migration..."
-    docker compose exec api alembic upgrade head
+    {{compose}} exec api alembic upgrade head
     @echo "Setup complete! https://localhost (Traefik TLS)"
 
