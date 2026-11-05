@@ -1,6 +1,6 @@
 # Moose Sports Empire
 
-> **Note / Disclaimer**: Due to Yahoo restricting developer access to their API, this project is archived as an example. It is not actively deployed — configuration values shown here are placeholders, not a live environment. Use at your own risk.
+> **Note / Disclaimer**: Due to Yahoo restricting developer access to their API, this project is currently archived. It is not actively deployed and maintained. Once I decide which platform to use for fantasy sports data, I may revive this project.
 
 
 The ultimate fantasy baseball companion platform that transforms your league experience with AI-powered insights, real-time matchup analysis, and automated recaps. Stop juggling spreadsheets and start dominating your league with intelligent tools that do the heavy lifting for you.
